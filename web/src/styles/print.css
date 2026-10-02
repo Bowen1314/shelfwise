@@ -1,0 +1,107 @@
+/*
+ * Printing the shelf-talkers. The on-screen app is hidden; a dedicated print-only copy of the Bridge shelf
+ * is shown instead, six cards (2 x 3) per page with dashed cut guides. Black on white, serif, no fills.
+ */
+@page {
+  margin: 12mm;
+}
+
+.print-sheet {
+  display: none;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 12pt;
+  }
+
+  .app {
+    display: none !important;
+  }
+
+  .print-sheet {
+    display: block;
+  }
+
+  .print-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-page__sample {
+    margin: 0 0 3mm;
+    font-family: var(--font-sans);
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .print-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(80mm, auto);
+    border-top: 0.75pt dashed #444;
+    border-left: 0.75pt dashed #444;
+  }
+
+  .print-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding: 7mm 7mm 5mm;
+    border-right: 0.75pt dashed #444;
+    border-bottom: 0.75pt dashed #444;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    font-family: var(--font-serif);
+    color: #000;
+  }
+
+  .print-card__eyebrow {
+    margin: 0 0 3mm;
+    font-size: 10.5pt;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.08em;
+    line-height: 1.3;
+  }
+
+  .print-card__title {
+    margin: 0 0 3mm;
+    font-size: 20pt;
+    font-weight: 700;
+    line-height: 1.12;
+  }
+
+  .print-card__why {
+    margin: 0;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  .print-card__foot {
+    margin-top: auto;
+    padding-top: 3mm;
+    font-family: var(--font-sans);
+    font-size: 8.5pt;
+    line-height: 1.4;
+  }
+
+  .print-card__foot p {
+    margin: 0;
+  }
+
+  .print-card__sample {
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+}

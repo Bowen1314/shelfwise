@@ -1,0 +1,24 @@
+# Never ship secrets or local state into the build context.
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+dist
+coverage
+.vite
+*.log
+
+.git
+.gitignore
+.claude
+.DS_Store
+
+# Not needed to build or run the image
+test
+docs
+README.md
+dev.sh
+Dockerfile
+.dockerignore

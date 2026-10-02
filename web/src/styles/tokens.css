@@ -1,0 +1,108 @@
+/*
+ * Design tokens. Warm paper, deep ink, one restrained library green, a secondary ochre.
+ * Every text/background pair below is checked against WCAG AA (4.5:1).
+ */
+:root {
+  color-scheme: light dark;
+
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* 8px scale */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+
+  --r-s: 6px;
+  --r-m: 10px;
+  --r-l: 14px;
+
+  --measure: 68ch;
+
+  /* Light theme */
+  --paper: #faf7f2;
+  --surface: #fffdf9;
+  --card-stock: #fffefb;
+  --sunken: #f3eee4;
+  --ink: #221e18;
+  --ink-2: #5a5247;
+  --rule: #e4ddd0;
+  --rule-strong: #cdc3b0;
+  --shadow: 0 1px 2px rgb(60 40 20 / 0.06), 0 6px 20px -8px rgb(60 40 20 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(60 40 20 / 0.08), 0 14px 32px -12px rgb(60 40 20 / 0.22);
+
+  --accent: #2e5c4d;
+  --accent-hover: #234a3e;
+  --accent-soft: #e3eee8;
+  --accent-soft-ink: #1c4a39;
+  --btn-bg: #2e5c4d;
+  --btn-bg-hover: #234a3e;
+  --btn-ink: #ffffff;
+
+  --ochre-soft: #f6e8c6;
+  --ochre-ink: #5e3f08;
+  --ochre-line: #d5b25f;
+  --oxblood-soft: #f6dedc;
+  --oxblood-ink: #721d1d;
+  --oxblood-line: #d9a5a1;
+  --slate-soft: #e2eaf3;
+  --slate-ink: #25415f;
+  --slate-line: #a9bdd4;
+  --neutral-soft: #ebe6dc;
+  --neutral-ink: #4a4338;
+
+  --degraded-soft: #f9e2d0;
+  --degraded-ink: #70350a;
+
+  --focus: #1a56a0;
+  --highlight: #fbefc9;
+  --backdrop: rgb(30 22 12 / 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #17150f;
+    --surface: #1f1c15;
+    --card-stock: #231f18;
+    --sunken: #14120d;
+    --ink: #efe9dc;
+    --ink-2: #b9b0a0;
+    --rule: #342f27;
+    --rule-strong: #4c453a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -10px rgb(0 0 0 / 0.6);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 16px 36px -12px rgb(0 0 0 / 0.7);
+
+    --accent: #8cc3a8;
+    --accent-hover: #a9d6bf;
+    --accent-soft: #1d3a2e;
+    --accent-soft-ink: #a9dcc2;
+    --btn-bg: #8cc3a8;
+    --btn-bg-hover: #a9d6bf;
+    --btn-ink: #0f2219;
+
+    --ochre-soft: #3f3110;
+    --ochre-ink: #f0d28c;
+    --ochre-line: #7b6320;
+    --oxblood-soft: #4a1f1f;
+    --oxblood-ink: #f5b9b6;
+    --oxblood-line: #7d3a38;
+    --slate-soft: #1f3048;
+    --slate-ink: #b5cdee;
+    --slate-line: #3f5778;
+    --neutral-soft: #2b2720;
+    --neutral-ink: #cfc6b5;
+
+    --degraded-soft: #47260f;
+    --degraded-ink: #f5c39a;
+
+    --focus: #8cb8ff;
+    --highlight: #3b3114;
+    --backdrop: rgb(0 0 0 / 0.55);
+  }
+}
