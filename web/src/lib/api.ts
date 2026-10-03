@@ -15,7 +15,7 @@ type Fetch = typeof fetch;
 
 /** `?mock=1` swaps in a scripted event player. The branch is a build-time constant, so production drops it. */
 async function resolveFetch(): Promise<Fetch> {
-  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("mock")) {
+  if ((import.meta.env.DEV || import.meta.env.VITE_PREVIEW_MOCK === "1") && new URLSearchParams(window.location.search).has("mock")) {
     const { mockFetch } = await import("../dev/mock");
     return mockFetch;
   }

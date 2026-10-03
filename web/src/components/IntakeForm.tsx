@@ -72,9 +72,15 @@ export function IntakeForm({ values, onChange, onSubmit, samples, disabled, fail
 
   return (
     <section className="card intake" aria-labelledby={`${id}-heading`}>
+      <div className="intake__topline">
+        <span>02</span>
+        <span>New shelf brief</span>
+        <span className="intake__topline-rule" aria-hidden="true" />
+      </div>
       <h2 id={`${id}-heading`} ref={heading} tabIndex={-1} className="card__title">
-        What does your community love right now?
+        What should this shelf make possible?
       </h2>
+      <p className="intake__lead">Give Shelfwise a place, an audience and a few cultural signals. It will connect the dots and write the shelf-talkers for you.</p>
 
       {failure && (
         <div className="notice notice--error" role="alert">

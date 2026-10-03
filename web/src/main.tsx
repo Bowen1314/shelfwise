@@ -8,6 +8,7 @@ import "./styles/layout.css";
 import "./styles/forms.css";
 import "./styles/run.css";
 import "./styles/results.css";
+import "./styles/redesign.css";
 import "./styles/print.css";
 
 const container = document.getElementById("root");

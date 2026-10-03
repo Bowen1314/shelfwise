@@ -57,6 +57,13 @@ const ICONS = {
   list: <path d="M9 6.5h10M9 12h10M9 17.5h10M5 6.5v.01M5 12v.01M5 17.5v.01" />,
   send: <path d="M5 12h14M13 6l6 6-6 6" />,
   sliders: <path d="M5 8h9M18 8h1M5 16h1M10 16h9M14 6v4M6 14v4" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M12 2.5v2M12 19.5v2M4.8 4.8l1.4 1.4M17.8 17.8l1.4 1.4M2.5 12h2M19.5 12h2M4.8 19.2l1.4-1.4M17.8 6.2l1.4-1.4" />
+    </>
+  ),
+  moon: <path d="M20.2 15.4A8.3 8.3 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4z" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;
