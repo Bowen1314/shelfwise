@@ -129,7 +129,7 @@
   font-weight: 600;
   line-height: 1.2;
   text-align: center;
-  transition: color 0.15s, background-color 0.15s;
+  transition: color 0.12s, background-color 0.12s;
 }
 
 @media (min-width: 640px) {
@@ -253,17 +253,11 @@
   border-top: 4px solid var(--accent);
   border-radius: var(--r-s) var(--r-s) var(--r-m) var(--r-m);
   box-shadow: var(--shadow);
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow 0.12s, border-color 0.12s;
 }
 
 .talker:hover {
   box-shadow: var(--shadow-lift);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .talker:hover {
-    transform: translateY(-2px);
-  }
 }
 
 .talker__eyebrow {

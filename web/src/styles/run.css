@@ -195,7 +195,7 @@
   text-align: left;
   font-family: var(--font-sans);
   font-size: 0.9375rem;
-  transition: border-color 0.15s;
+  transition: border-color 0.12s;
 }
 
 .run-summary__toggle:hover {
@@ -286,7 +286,7 @@
   border: 1px solid var(--rule-strong);
   border-radius: var(--r-m);
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color 0.12s, background-color 0.12s;
 }
 
 .option:hover {
@@ -399,7 +399,7 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 2 * var(--s4));
-  max-height: calc(100dvh - 2 * var(--s4));
+  max-height: calc(100svh - 2 * var(--s4)); /* svh: stays put while a phone's address bar collapses */
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--r-l);
@@ -409,7 +409,8 @@
 
 .app--sample .trail {
   top: 64px;
-  max-height: calc(100dvh - 80px);
+  max-height: calc(100vh - 80px);
+  max-height: calc(100svh - 80px);
 }
 
 .trail__panel {
@@ -720,7 +721,8 @@
   position: fixed;
   inset: auto 0 0 0;
   z-index: 40;
-  max-height: 82dvh;
+  max-height: 82vh;
+  max-height: 82svh;
   border-radius: var(--r-l) var(--r-l) 0 0;
   border-bottom: 0;
   box-shadow: 0 -6px 24px rgb(40 28 12 / 0.18);
@@ -728,7 +730,8 @@
 
 .app--sample .trail--sheet {
   top: auto;
-  max-height: 82dvh;
+  max-height: 82vh;
+  max-height: 82svh;
 }
 
 .trail--sheet:not(.is-open) .trail__panel {
@@ -854,7 +857,7 @@
   font-family: var(--font-sans);
   font-size: 0.875rem;
   font-weight: 600;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color 0.12s, background-color 0.12s;
 }
 
 .chip-button:hover:not(:disabled) {

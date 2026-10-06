@@ -1,12 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type HealthResponse, LIMITS_LINE, SAMPLE_DATA_LABEL } from "@shared/types";
 import { sampleBannerDetail, sampleBannerPlanner } from "../lib/banner";
+import { startThemeFade } from "../lib/themeFade";
 import { Icon, LogoMark, type IconName } from "./Icon";
 
 /** Persistent strip shown whenever the server runs on sample (fixture) data. */
 export function SampleBanner({ llm }: { llm?: HealthResponse["llm"] | undefined }) {
+  // The sticky sidebar and evidence trail sit below the banner (--banner-h in redesign.css). The banner wraps on
+  // narrower screens, so its height is measured rather than assumed.
+  const banner = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = banner.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => root.style.setProperty("--banner-h", `${el.offsetHeight}px`));
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--banner-h");
+    };
+  }, []);
+
   return (
-    <div className="sample-banner" role="note" aria-label="Data source">
+    <div className="sample-banner" role="note" aria-label="Data source" ref={banner}>
       <div className="sample-banner__inner">
         <Icon name="flask" />
         <strong>{SAMPLE_DATA_LABEL}</strong>
@@ -122,6 +138,8 @@ function initialTheme(): Theme {
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const endFade = useRef<(() => void) | null>(null);
+  useEffect(() => () => endFade.current?.(), []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -142,7 +160,12 @@ export function ThemeToggle() {
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={dark}
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
-      onClick={() => setTheme(dark ? "light" : "dark")}
+      onClick={() => {
+        // Colours cross-fade only for this switch; the first render and hover states are not animated.
+        endFade.current?.();
+        endFade.current = startThemeFade(document.documentElement.classList);
+        setTheme(dark ? "light" : "dark");
+      }}
     >
       <Icon name={dark ? "sun" : "moon"} />
       <span className="theme-toggle__label">{dark ? "Light" : "Dark"}</span>

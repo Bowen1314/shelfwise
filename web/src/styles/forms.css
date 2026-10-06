@@ -104,7 +104,7 @@
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.4;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
 
 .input::placeholder {
@@ -242,7 +242,7 @@
   border: 1px solid var(--rule-strong);
   border-radius: var(--r-m);
   font-family: var(--font-sans);
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color 0.12s, background-color 0.12s;
 }
 
 .sample-chip:hover:not(:disabled) {
