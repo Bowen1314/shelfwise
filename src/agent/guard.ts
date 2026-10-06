@@ -11,6 +11,7 @@ import {
   type ReportNote,
   type TrendSummary,
 } from "../shared/types.js";
+import { formatAffinity } from "../shared/affinity.js";
 import { type CallRecord, type EntityRecord, EvidenceStore, normName, toRef } from "./evidence.js";
 
 /**
@@ -125,7 +126,7 @@ function lookup(handle: string, ctx: GuardContext): EntityRecord | undefined {
 const isReduced = (c: CallRecord): boolean => c.status === "partial" || c.status === "degraded";
 
 function affinityText(a?: number): string {
-  return a === undefined ? "" : `, affinity ${a}`;
+  return a === undefined ? "" : `, affinity ${formatAffinity(a)}`;
 }
 
 function citeFor(call: CallRecord, entity: EntityRecord): Cite {

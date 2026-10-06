@@ -3,6 +3,7 @@ import type { PreviewRow, ToolResultView } from "@shared/types";
 import type { CallEntry } from "../lib/reduce";
 import { entityTypeLabel, formatDuration } from "../lib/format";
 import { shortTool } from "../lib/progress";
+import { formatAffinity } from "@shared/affinity";
 import { Icon } from "./Icon";
 import { StatusChip, TrendChip } from "./Chips";
 
@@ -36,7 +37,7 @@ function PreviewList({ rows }: { rows: PreviewRow[] }) {
             <li key={`${row.handle ?? row.name}-${index}`} className="preview__row">
               <span className="preview__name">{row.name}</span>
               {meta && <span className="preview__meta">{meta}</span>}
-              {row.affinity !== undefined && <span className="preview__affinity">affinity {row.affinity}</span>}
+              {row.affinity !== undefined && <span className="preview__affinity">affinity {formatAffinity(row.affinity)}</span>}
               {row.detail && <span className="preview__meta">{row.detail}</span>}
             </li>
           );
@@ -85,7 +86,7 @@ function ResultDetails({ result }: { result: ToolResultView }) {
           <p>{result.local.summary}</p>
           <p className="trail__fine">
             {result.local.entity.name} within {result.local.within}: {result.local.areas} {result.local.areas === 1 ? "area" : "areas"}
-            {result.local.topAffinity !== undefined && `, top affinity ${result.local.topAffinity}`}
+            {result.local.topAffinity !== undefined && `, top affinity ${formatAffinity(result.local.topAffinity)}`}
           </p>
         </section>
       )}

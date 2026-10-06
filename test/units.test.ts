@@ -17,6 +17,7 @@ import { type AcquireResult, RunQueue } from "../src/server/queue.js";
 import { RateLimiter, clientIp } from "../src/server/ratelimit.js";
 import { parseForm, parseRunRequest } from "../src/server/request.js";
 import { AGE_BANDS, type FormInput } from "../src/shared/types.js";
+import { formatAffinity } from "../src/shared/affinity.js";
 
 const tool = (name: string): ToolDef => {
   const t = TOOLS_SNAPSHOT.find((x) => x.name === name);
@@ -569,6 +570,16 @@ describe("entity types from live rows", () => {
   });
 });
 
+describe("formatAffinity", () => {
+  it("shows two decimals at most", () => {
+    assert.equal(formatAffinity(0.9432074816979662), "0.94");
+    assert.equal(formatAffinity(0.90817863330107), "0.91");
+    assert.equal(formatAffinity(0.71), "0.71");
+    assert.equal(formatAffinity(0.9), "0.9");
+    assert.equal(formatAffinity(1), "1");
+  });
+});
+
 describe("where_popular summary", () => {
   const heat = (n: number) =>
     Array.from({ length: n }, (_, i) => ({ location: { geohash: `dr5r${i}` }, query: { affinity: Number((0.9 - i * 0.01).toFixed(2)) } }));
@@ -589,6 +600,12 @@ describe("where_popular summary", () => {
     assert.equal(rec.view.resultCount, 10);
     assert.equal(rec.view.summary, "Qloo returned 10 areas within Newark, NJ; the strongest has affinity 0.9.");
     assert.equal(rec.local?.areas, 10);
+  });
+
+  it("rounds a live affinity in the summary but keeps the exact value", () => {
+    const rec = add(new EvidenceStore(), [{ location: { geohash: "dr5r0" }, query: { affinity: 0.9989764585465711 } }]);
+    assert.equal(rec.view.summary, "Qloo returned 1 area within Newark, NJ; the strongest has affinity 1.");
+    assert.equal(rec.local?.topAffinity, 0.9989764585465711);
   });
 
   it("keeps a summary the harness did send, and says so when nothing came back", () => {

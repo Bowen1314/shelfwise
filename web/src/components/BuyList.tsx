@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BuyItem, Report } from "@shared/types";
 import { buyListToCsv, buyListToText, copyText, csvFileName, downloadCsv } from "../lib/exportReport";
+import { formatAffinity } from "@shared/affinity";
 import { plural } from "../lib/format";
 import { CiteButton, EvidenceChips } from "./CiteButton";
 import { ReducedChip, SignalChip, TrendChip } from "./Chips";
@@ -45,7 +46,7 @@ function EvidenceBlock({ item }: { item: BuyItem }) {
                     </>
                   )}
                   result {rec.position} of {rec.of}
-                  {rec.affinity !== undefined && `, affinity ${rec.affinity}`} <CiteButton callId={rec.callId} />
+                  {rec.affinity !== undefined && `, affinity ${formatAffinity(rec.affinity)}`} <CiteButton callId={rec.callId} />
                 </li>
               ))}
             </ul>
@@ -59,7 +60,7 @@ function EvidenceBlock({ item }: { item: BuyItem }) {
           {rank ? (
             <>
               {rank.position} of {rank.of}
-              {rank.affinity !== undefined && `, affinity ${rank.affinity}`} <CiteButton callId={rank.callId} />
+              {rank.affinity !== undefined && `, affinity ${formatAffinity(rank.affinity)}`} <CiteButton callId={rank.callId} />
             </>
           ) : (
             <Muted>Not ranked for this audience.</Muted>
@@ -75,7 +76,7 @@ function EvidenceBlock({ item }: { item: BuyItem }) {
               {localFit.summary} <CiteButton callId={localFit.callId} />
               <span className="evidence__fine">
                 Within {localFit.within}: {localFit.areas} {plural(localFit.areas, "area")}
-                {localFit.topAffinity !== undefined && `, top affinity ${localFit.topAffinity}`}
+                {localFit.topAffinity !== undefined && `, top affinity ${formatAffinity(localFit.topAffinity)}`}
               </span>
             </>
           ) : (

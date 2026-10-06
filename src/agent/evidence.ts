@@ -8,6 +8,7 @@ import type {
   ToolStatus,
   TrendSummary,
 } from "../shared/types.js";
+import { formatAffinity } from "../shared/affinity.js";
 import type { JsonObject, QlooEnvelope } from "../qloo/types.js";
 import { summarizeSeries } from "./trend.js";
 
@@ -410,7 +411,7 @@ export class EvidenceStore {
         points.length === 0
           ? `Qloo returned no areas within ${within} for this title.`
           : `Qloo returned ${points.length} area${points.length === 1 ? "" : "s"} within ${within}` +
-            (topAffinity !== undefined ? `; the strongest has affinity ${topAffinity}.` : "."),
+            (topAffinity !== undefined ? `; the strongest has affinity ${formatAffinity(topAffinity)}.` : "."),
     };
   }
 
