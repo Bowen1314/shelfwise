@@ -74,17 +74,22 @@ function PrintCard({ card, sample }: { card: BridgeCard; sample: boolean }) {
   );
 }
 
+/** How many printed pages the shelf-talkers take. */
+export function talkerPageCount(report: Report): number {
+  return Math.ceil(report.bridgeShelf.length / CARDS_PER_PAGE);
+}
+
 /**
- * Print-only copy of the shelf-talkers: six cards (2 x 3) per page, one page per group, so the layout never
- * depends on where the browser decides to break. Hidden on screen; the print stylesheet hides everything else.
+ * Print-only pages of shelf-talkers: six cards (2 x 3) per page, one page per group, so the layout never depends on
+ * where the browser decides to break. Rendered inside the Print desk's print-only sheet (see PrintArea).
  */
-export function PrintSheet({ report }: { report: Report }) {
+export function PrintShelfTalkers({ report }: { report: Report }) {
   const pages: BridgeCard[][] = [];
   for (let i = 0; i < report.bridgeShelf.length; i += CARDS_PER_PAGE) {
     pages.push(report.bridgeShelf.slice(i, i + CARDS_PER_PAGE));
   }
   return (
-    <div className="print-sheet" aria-hidden="true">
+    <>
       {pages.map((cards, index) => (
         <section key={cards[0]?.id ?? index} className="print-page">
           {report.sample && <p className="print-page__sample">{SAMPLE_DATA_LABEL}</p>}
@@ -95,6 +100,6 @@ export function PrintSheet({ report }: { report: Report }) {
           </div>
         </section>
       ))}
-    </div>
+    </>
   );
 }

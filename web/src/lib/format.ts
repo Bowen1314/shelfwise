@@ -27,6 +27,8 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
 /** Qloo entity types arrive as "tv_show" or "urn:entity:tv_show"; show them as people say them. */
 export function entityTypeLabel(type: string | undefined): string | null {
   if (!type) return null;
+  // Qloo puts a bare "urn:entity" in `type` on some rows (the real type is in `subtype`); it names no type.
+  if (/^(urn:entity|entity|urn:tag)$/i.test(type.trim())) return null;
   const bare = type.replace(/^urn:(entity|tag):/, "").replace(/^.*:/, "");
   const known = ENTITY_TYPE_LABELS[bare];
   if (known) return known;

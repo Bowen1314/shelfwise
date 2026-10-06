@@ -15,7 +15,12 @@ function RawResult({ raw }: { raw: unknown }) {
   return (
     <details className="raw" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>Raw Qloo result</summary>
-      {open && <pre className="code code--scroll">{JSON.stringify(raw, null, 2)}</pre>}
+      {open &&
+        (typeof raw === "string" ? (
+          <p className="trail__fine">{raw}</p>
+        ) : (
+          <pre className="code code--scroll">{JSON.stringify(raw, null, 2)}</pre>
+        ))}
     </details>
   );
 }

@@ -4,6 +4,7 @@ import type { Report } from "@shared/types";
 import { buyListToCsv, buyListToText } from "../src/lib/exportReport";
 import { sampleBannerDetail, sampleBannerPlanner } from "../src/lib/banner";
 import { httpFailure, minutesPhrase } from "../src/lib/failure";
+import { entityTypeLabel } from "../src/lib/format";
 import { budgetMath, containsContactDetails, EMPTY_FORM, validateForm } from "../src/lib/validate";
 
 describe("containsContactDetails", () => {
@@ -153,5 +154,19 @@ describe("sampleBannerDetail", () => {
     assert.match(text, /built-in placeholders/);
     assert.match(text, /real language model \(nvidia\/nemotron-3-super-120b-a12b\)/);
     assert.match(text, /sample data/);
+  });
+});
+
+describe("entityTypeLabel", () => {
+  it("names plain and URN entity types the way people say them", () => {
+    assert.equal(entityTypeLabel("book"), "Book");
+    assert.equal(entityTypeLabel("urn:entity:book"), "Book");
+    assert.equal(entityTypeLabel("urn:entity:tv_show"), "TV show");
+    assert.equal(entityTypeLabel("movie"), "Film");
+  });
+
+  it("shows no label for the bare urn:entity Qloo puts on some live rows", () => {
+    assert.equal(entityTypeLabel("urn:entity"), null);
+    assert.equal(entityTypeLabel(undefined), null);
   });
 });

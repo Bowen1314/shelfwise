@@ -64,6 +64,8 @@ const ICONS = {
     </>
   ),
   moon: <path d="M20.2 15.4A8.3 8.3 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4z" />,
+  shelf: <path d="M3.5 20h17M6 20V7h3.5v13M9.5 20V5H13v15M15 19.5l-.4-11.6 3.4-.5 1.6 12" />,
+  trash: <path d="M5 7h14M10 4h4M7 7l.8 12.2a1 1 0 0 0 1 .8h6.4a1 1 0 0 0 1-.8L17 7M10.5 11v5M13.5 11v5" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;

@@ -20,7 +20,7 @@ Every workflow tool returns the same result envelope (`schema_version "1.0-previ
 | `qloo_recommend` | Entities related to a taste profile (signals + location + demographic + filters) | Books for fans of each show/artist/game, per place and audience |
 | `qloo_rank` | Rank up to 10 supplied options for one profile | Ordering the buy/feature shortlist for the audience |
 | `qloo_where_popular` | Geographic heat for one entity within an area | Local fit of a top title |
-| `qloo_trends` | Time series for up to 5 entities over a date range | Rising vs fading |
+| `qloo_trends` | Time series for up to 5 entities over a date range | Whether interest in the shows, films, artists or podcasts patrons love is rising (books have no trend data) |
 | `qloo_compare_audiences` | Two groups of entity signals compared | Finding a title that bridges two shows or two patron groups |
 | `qloo_entity_tags` | Tags that jointly characterise entities | Saying what a show and a book share |
 | `qloo_audience_demographics` | Demographic distribution for an entity | Available to the agent; not part of the default workflow |
@@ -710,7 +710,7 @@ Raw input schema (as published by the server):
 These facts come from reading `@qloo/qloo-harness/dist`; they are not in the tool descriptions.
 
 - **No input validation at the MCP layer.** Invalid arguments surface only as `MCP_ADAPTER_FAILURE` (non-retryable) with no reason.
-  Shelfwise therefore validates every call against the schemas above (plus the trend-date and demographic-needs-location rules) before calling.
+  Shelfwise therefore validates every call against the schemas above (plus the trend-date, trend-type and demographic-needs-location rules) before calling.
 - **Without a key:** `tools/list` and `qloo_capabilities` work (`adapter.ready: false`). Every workflow tool returns `status: "error"`, `error.code: "QLOO_AUTH"`, `retryable: false`.
 - **Entity inputs are resolved by name** (Qloo search). Ambiguous or unknown names return `status: "needs_input"` with `resolution.issues[]`:
   `{ input, kind: "ambiguous" | "not_found", input_kind: "entity" | "tag", field, candidates: [{ id, name, type, rank, score, popularity, parent_types, description, release_year }] }`
@@ -725,23 +725,26 @@ These facts come from reading `@qloo/qloo-harness/dist`; they are not in the too
 - **`rank`** sends `filter.results.entities` (the options) and `take = number of options`. The tool description warns scores from separate calls are not comparable.
 - **`where_popular`** is a heatmap query (`filter.type=urn:heatmap`, the entity as `signal.interests.entities`, `filter.location.query = within`). Results are the raw heatmap points, sorted by `query.affinity`.
 - **`trends`** calls `/v2/trending` once **per entity**. Output is under `series[]` (`{ entity, points[] }`), not `results`; `points` are passed through unnormalised, and the status is `ok` even when `points` is empty.
+  The schema's `entity_type` enum lists book, place and videogame, but the live API answers HTTP 400 for them ("filter.type must be one of urn:entity:actor, artist, brand, movie, person, podcast, tv_show").
+  Shelfwise refuses those types before calling and checks trends only on the loved signals (tv_show, movie, artist, podcast, person, brand).
+- **Successful results carry no `summary`**; Shelfwise writes one from the data (for `where_popular`, the number of heatmap areas and the strongest affinity).
 - **`compare_audiences`** returns the raw (size-bounded) `/v2/analysis/compare` `results`; its shape is not normalised by the harness.
-- **Entity result shape** (recommend, rank, describe): `{ entity_id, name, type, subtype, popularity, affinity, explainability?, properties? }` where `properties` is limited to
+- **Entity result shape** (recommend, rank, describe): `{ entity_id, name, type, subtype, popularity, affinity, explainability?, properties? }`. Live, `type` is the bare `urn:entity` and the real type is in `subtype` (`urn:entity:book`); Shelfwise reads the most specific one. `properties` is limited to
   `description, short_description, release_year, release_date, content_rating, duration, image, geocode, address, price_level, business_rating`.
 - **Transport:** MCP protocol `2024-11-05` over stdio, one JSON result per call (`structuredContent` and `content[0].text`), `isError: true` when `status` is `error`.
 - **Quota:** one tool call can fan out into several upstream requests (a search per named input; one trending request per entity), so Qloo's quota is consumed faster than the call count suggests.
 
 ## Gap analysis: Shelfwise design vs. what the tool surface supports
 
-Supported as designed: a `book` entity type (`target_type`, `option_type`, `entity_type`); cross-domain signals (TV, film, music, games, podcasts, books) in one recommend call;
-place conditioning (`signal_location`); ambiguity handling (`needs_input` with candidates); audience ranking (`qloo_rank`); geographic heat (`qloo_where_popular`); time series (`qloo_trends`); two-group comparison (`qloo_compare_audiences`).
+Supported as designed: a `book` entity type (`target_type`, `option_type`, `entity_type` for `where_popular`); cross-domain signals (TV, film, music, games, podcasts, books) in one recommend call;
+place conditioning (`signal_location`); ambiguity handling (`needs_input` with candidates); audience ranking (`qloo_rank`); geographic heat (`qloo_where_popular`); time series (`qloo_trends`, for the loved signals, not for books); two-group comparison (`qloo_compare_audiences`).
 
 Gaps and limits (Shelfwise states these in the UI and README rather than papering over them):
 
 1. **Age bands are coarse.** Qloo's youngest band is "24 and younger"; there is no separate teen, child or middle-grade audience. "Make it for teens" is therefore "24 and younger" in Qloo's terms, and children's collections cannot be targeted. Any age focus also requires a place.
 2. **No book metadata beyond title and (sometimes) year.** The harness does not return author, ISBN, publisher, format, price, page count or availability. Shelf-talkers show title (and year when returned); staff must look titles up in their own catalogue or vendor. Budget arithmetic uses only an average price the user types in.
-3. **"Local fit" is two different things.** `signal_location` re-weights a recommendation toward a place; `qloo_where_popular` returns geographic heat points for one entity. The point shape is not normalised by the harness, and whether Qloo has heatmap data for book entities is not documented there. **Unverified until a live key is available.**
-4. **Trend and compare payload shapes are unverified.** Both are raw pass-throughs. Shelfwise reads them defensively (it needs dated points and a numeric metric to call a direction; otherwise it reports "unknown") and the sample-data shapes are best guesses.
+3. **"Local fit" is two different things.** `signal_location` re-weights a recommendation toward a place; `qloo_where_popular` returns geographic heat points for one entity. The point shape is not normalised by the harness. Checked live on 2026-10-06: a book heatmap within "Newark, NJ" returns areas with `query.affinity`.
+4. **No trend data for books.** `/v2/trending` rejects books, so a title can never be called rising or fading. Shelfwise trends the shows, films, artists and podcasts patrons love and shows that as "interest in X", next to the titles X returned. Trend and compare payloads are raw pass-throughs: Shelfwise reads them defensively (it needs dated points and a numeric metric to call a direction; otherwise it reports "unknown").
 5. **No per-item attribution in multi-signal calls** beyond the optional, unverified-shape `explainability`. Shelfwise makes one `qloo_recommend` call per signal so "Loved X? Try Y" is true by construction.
 6. **No holdings or circulation data.** Qloo is taste data; Shelfwise cannot tell what a branch already owns.
 7. **No place disambiguation** (free text), so an ambiguous place name is Qloo's to resolve.

@@ -1,6 +1,7 @@
 import type { CallOptions, JsonObject, QlooEnvelope, QlooToolClient, ToolDef } from "../types.js";
 import { syntheticError } from "../types.js";
-import { SAMPLE_BOOKS, SAMPLE_PLACES, SAMPLE_SIGNALS, SAMPLE_TAGS, type SampleBook } from "./data.js";
+import { TREND_ENTITY_TYPES } from "../validate.js";
+import { SAMPLE_BOOKS, SAMPLE_PLACES, SAMPLE_SIGNALS, SAMPLE_TAGS, type SampleBook, type SampleSignal } from "./data.js";
 import { TOOLS_SNAPSHOT } from "./tools.snapshot.js";
 
 /**
@@ -17,6 +18,7 @@ interface Ent {
   year?: number;
   book?: SampleBook;
   signalKey?: string;
+  trend?: SampleSignal["trend"];
 }
 
 const norm = (s: string): string =>
@@ -28,7 +30,7 @@ const norm = (s: string): string =>
     .trim();
 
 const UNIVERSE: Ent[] = [
-  ...SAMPLE_SIGNALS.map((s): Ent => ({ id: s.id, name: s.name, type: s.type, ...(s.year ? { year: s.year } : {}), signalKey: s.key })),
+  ...SAMPLE_SIGNALS.map((s): Ent => ({ id: s.id, name: s.name, type: s.type, ...(s.year ? { year: s.year } : {}), signalKey: s.key, ...(s.trend ? { trend: s.trend } : {}) })),
   ...SAMPLE_BOOKS.map((b): Ent => ({ id: `sample-book-${b.slug}`, name: b.name, type: "book", year: b.year, book: b })),
 ];
 
@@ -290,11 +292,16 @@ export class FixtureQlooClient implements QlooToolClient {
 
   private trends(args: JsonObject, started: number): QlooEnvelope {
     const path = "/v2/trending";
-    const ents = this.resolveMany(args["entities"], "entities", "book");
+    const type = String(args["entity_type"]);
+    if (!(TREND_ENTITY_TYPES as readonly string[]).includes(type)) {
+      // Mirrors the live API, which answers HTTP 400 for types it cannot trend (books among them).
+      return syntheticError("trends", "QLOO_UPSTREAM_REQUEST", `Qloo rejected the request (400): filter.type must be one of ${TREND_ENTITY_TYPES.join(", ")}.`, false, "Use a supported entity_type.");
+    }
+    const ents = this.resolveMany(args["entities"], "entities", type);
     if (ents.issues.length) return this.needsInput("trends", path, ents.issues, started);
     const end = new Date(`${String(args["end_date"])}T00:00:00Z`);
     const series = ents.ents.map(({ input, entity }) => {
-      const trend = entity.book?.trend ?? "none";
+      const trend = entity.type === type ? (entity.trend ?? "none") : "none";
       const points =
         trend === "none"
           ? []
@@ -306,7 +313,7 @@ export class FixtureQlooClient implements QlooToolClient {
             });
       return { entity: this.interpreted([{ input, entity }])[0], points };
     });
-    return this.envelope("trends", path, args, { status: "ok", summary: `Sample trend series for ${series.length} book(s).`, interpretation: { entity_type: "book", start_date: args["start_date"], end_date: args["end_date"] }, series, result_count: series.length }, started);
+    return this.envelope("trends", path, args, { status: "ok", summary: `Sample trend series for ${series.length} ${type.replace(/_/g, " ")} signal(s).`, interpretation: { entity_type: `urn:entity:${type}`, start_date: args["start_date"], end_date: args["end_date"] }, series, result_count: series.length }, started);
   }
 
   private compare(args: JsonObject, started: number): QlooEnvelope {

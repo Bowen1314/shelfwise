@@ -1,6 +1,8 @@
 /*
- * Printing the shelf-talkers. The on-screen app is hidden; a dedicated print-only copy of the Bridge shelf
- * is shown instead, six cards (2 x 3) per page with dashed cut guides. Black on white, serif, no fills.
+ * Printing. The on-screen app is hidden; the one print-only sheet (PrintArea, owned by the Print desk) is shown
+ * instead. It holds the sections chosen in the Print desk, each starting on a new page: shelf-talkers six cards
+ * (2 x 3) per page with dashed cut guides, then the buy list and programme ideas as plain lists. Outside the desk
+ * it holds the shelf-talkers only. Black on white, no fills, no app chrome.
  */
 @page {
   margin: 12mm;
@@ -103,5 +105,108 @@
   .print-card__sample {
     font-weight: 700;
     letter-spacing: 0.08em;
+  }
+
+  /* Buy list and programme ideas */
+  .print-doc {
+    font-family: var(--font-serif);
+    color: #000;
+  }
+
+  .print-doc p {
+    margin: 0;
+  }
+
+  .print-doc .print-page__sample {
+    margin-bottom: 3mm;
+  }
+
+  .print-doc__head {
+    margin: 0 0 5mm;
+    padding-bottom: 3mm;
+    border-bottom: 1pt solid #000;
+  }
+
+  .print-doc__kicker {
+    margin-bottom: 1.5mm;
+    font-family: var(--font-sans);
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .print-doc .print-doc__title {
+    font-size: 20pt;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .print-doc .print-doc__meta {
+    margin-top: 1.5mm;
+    font-family: var(--font-sans);
+    font-size: 9.5pt;
+  }
+
+  .print-doc .print-doc__note {
+    margin-bottom: 4mm;
+    font-family: var(--font-sans);
+    font-size: 10pt;
+    font-weight: 700;
+  }
+
+  .print-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .print-item {
+    display: grid;
+    grid-template-columns: 9mm minmax(0, 1fr);
+    gap: 0 3mm;
+    padding: 3mm 0;
+    border-bottom: 0.5pt solid #999;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-item--plain {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .print-item__rank {
+    font-family: var(--font-sans);
+    font-size: 13pt;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .print-doc .print-item__kind {
+    margin-bottom: 1mm;
+    font-family: var(--font-sans);
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .print-doc .print-item__title {
+    font-size: 13pt;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .print-doc .print-item__text {
+    margin-top: 1mm;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  .print-doc .print-item__fine {
+    margin-top: 1mm;
+    font-family: var(--font-sans);
+    font-size: 8.5pt;
+    line-height: 1.4;
   }
 }

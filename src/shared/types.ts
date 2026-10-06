@@ -228,7 +228,10 @@ export interface BuyEvidence {
   /** Position in the audience rank call. Scores from different calls are not comparable. */
   rank?: { callId: string; position: number; of: number; affinity?: number };
   localFit?: LocalFit;
+  /** Trend of the title itself. Qloo's trending data does not cover books, so live runs leave this empty. */
   trend?: TrendSummary;
+  /** Trends of the matched signals (the shows, films, artists... whose call returned this title). */
+  signalTrends?: TrendSummary[];
   /** True when any supporting call came back partial or degraded. */
   reduced: boolean;
 }

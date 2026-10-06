@@ -101,10 +101,11 @@ function resolveMany(inputs, field) {
 }
 
 const interpreted = (list) => list.map(({ input, entity }) => ({ input, entityId: entity.id, name: entity.name, type: entity.type, match: "exact" }));
+// Like live insights rows: `type` is the bare "urn:entity" and the real type is in `subtype`.
 const bookRow = (b, affinity) => ({
   entity_id: b.id,
   name: b.name,
-  type: "urn:entity:book",
+  type: "urn:entity",
   subtype: "urn:entity:book",
   popularity: 0.5,
   affinity,
@@ -164,17 +165,24 @@ function wherePopular(args) {
   const interp = { entity: interpreted([{ input: args.entity, entity: r.entity }])[0], within: args.within };
   if (norm(args.within) === "nowhereville") return envelope("where_popular", { status: "empty", summary: "No heat data there.", interpretation: interp, results: [], result_count: 0 });
   const results = [0.71, 0.64, 0.5].map((a, i) => ({ location: { latitude: 40.7 + i * 0.01, longitude: -74.1 + i * 0.01 }, query: { affinity: a } }));
-  return envelope("where_popular", { summary: `Found ${results.length} fake areas.`, interpretation: interp, results, result_count: results.length });
+  // The live harness sends no `summary` on a successful heatmap.
+  return envelope("where_popular", { interpretation: interp, results, result_count: results.length });
 }
 
+// The live /v2/trending answers HTTP 400 for these types; anything else in the schema enum would be accepted.
+const TRENDABLE = ["tv_show", "movie", "artist", "podcast", "person", "brand"];
+
 function trends(args) {
+  if (!TRENDABLE.includes(args.entity_type)) {
+    return err("trends", "QLOO_UPSTREAM_REQUEST", "Qloo rejected the request (400): filter.type must be one of urn:entity:actor, artist, brand, movie, person, podcast, tv_show.", false);
+  }
   const ents = resolveMany(args.entities, "entities");
   if (ents.issues.length) return needsInput("trends", ents.issues);
   const series = ents.entities.map(({ input, entity }) => ({
     entity: interpreted([{ input, entity }])[0],
     points: Array.from({ length: 12 }, (_, i) => ({ date: `2026-${String(i + 1).padStart(2, "0")}-01`, popularity: Number((0.3 + i * 0.03).toFixed(3)) })),
   }));
-  return envelope("trends", { summary: `Fake trend series for ${series.length} book(s).`, interpretation: { start_date: args.start_date, end_date: args.end_date }, series, result_count: series.length });
+  return envelope("trends", { interpretation: { entity_type: `urn:entity:${args.entity_type}`, start_date: args.start_date, end_date: args.end_date }, series, result_count: series.length });
 }
 
 function compare(args) {

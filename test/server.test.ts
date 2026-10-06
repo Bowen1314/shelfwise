@@ -485,6 +485,16 @@ describe("full run from the sample form", { timeout: 30_000 }, () => {
       assert.ok(cites.length > 0);
       for (const c of cites) assert.ok(callIds.has(c.callId), `cite ${c.callId} does not match any tool_call`);
 
+      // trends: only on the loved signals Qloo can trend (never on books), and joined to the titles they returned
+      const trendCalls = calls.filter((c) => c.call.tool === "qloo_trends");
+      assert.ok(trendCalls.length > 0, "the sample run checks trends");
+      for (const c of trendCalls) assert.ok(["tv_show", "movie", "artist", "podcast", "person", "brand"].includes(String(c.call.args["entity_type"])), JSON.stringify(c.call.args));
+      assert.ok(results.every((r) => r.result.status !== "error"), "no red errors in the evidence trail");
+      assert.ok(report.buyList.every((b) => b.evidence.trend === undefined), "no book carries a trend");
+      assert.ok(report.buyList.some((b) => (b.evidence.signalTrends ?? []).length > 0), "some title shows the trend of the signal behind it");
+      const localResult = results.find((r) => r.result.tool === "qloo_where_popular")?.result;
+      assert.ok(localResult && !/returned 0 items/.test(localResult.summary), localResult?.summary);
+
       // the session is stored, idle, and reusable
       const stored = app.sessions.get(session.sessionId);
       assert.ok(stored);
@@ -501,6 +511,8 @@ describe("full run from the sample form", { timeout: 30_000 }, () => {
         assert.equal(res.status, 200);
         assert.equal(only(res.events, "error").length, 0, `${form.interests}: ${JSON.stringify(only(res.events, "error"))}`);
         assert.ok(["completed", "awaiting_input"].includes(lastDone(res.events).reason), form.interests);
+        const failed = only(res.events, "tool_result").filter((r) => r.result.status === "error");
+        assert.equal(failed.length, 0, `${form.interests}: ${failed.map((r) => r.result.summary).join(" | ")}`);
       }
     });
   });

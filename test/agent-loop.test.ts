@@ -68,14 +68,14 @@ function goodSubmission(req: ChatRequest): Record<string, unknown> {
 
 const submit = (build: (req: ChatRequest) => Record<string, unknown> = goodSubmission): LlmStep => (req) => calls(toolCall("submit_report", build(req)));
 
-/** The full workflow: per-signal recommends, then rank + where_popular + trends, then the report. */
+/** The full workflow: per-signal recommends, then rank + where_popular + trends on a loved show, then the report. */
 const happyScript = (): LlmStep[] => [
   () => calls(plan(), rec(["Severance"]), rec(["The Bear"])),
   (req) =>
     calls(
       toolCall("qloo_rank", { option_type: "book", options: [ref(req, "Piranesi"), ref(req, "Station Eleven"), ref(req, "Crying in H Mart")], signals: [ref(req, "Severance")], signal_location: PLACE }),
       toolCall("qloo_where_popular", { entity: ref(req, "Piranesi"), entity_type: "book", within: PLACE }),
-      toolCall("qloo_trends", { entities: [ref(req, "Piranesi")], entity_type: "book", start_date: "2026-01-01", end_date: "2026-09-30" }),
+      toolCall("qloo_trends", { entities: [ref(req, "Severance")], entity_type: "tv_show", start_date: "2026-01-01", end_date: "2026-09-30" }),
     ),
   submit(),
 ];
@@ -124,8 +124,30 @@ describe("agent loop: the workflow", () => {
     assert.equal(top.book.name, "Piranesi");
     assert.ok(top.evidence.rank, "rank joined from qloo_rank");
     assert.ok(top.evidence.localFit, "local fit joined from qloo_where_popular");
-    assert.equal(top.evidence.trend?.direction, "rising", "direction computed by Shelfwise from the series");
+    assert.equal(top.evidence.trend, undefined, "Qloo has no trend data for books");
+    assert.deepEqual(
+      top.evidence.signalTrends?.map((x) => [x.entity.name, x.direction]),
+      [["Severance", "rising"]],
+      "the matched signal's direction, computed by Shelfwise from the series",
+    );
+    assert.ok(top.cites.some((c) => c.tool === "qloo_trends"));
+    assert.equal(report.buyList.find((b) => b.book.name === "Crying in H Mart")?.evidence.signalTrends, undefined, "The Bear was not trended");
     assert.deepEqual(top.evidence.matchedSignals.map((s) => s.name).sort(), ["Severance", "The Bear"]);
+  });
+
+  it("summarises live-shaped results: heatmap areas, series, and real entity types instead of urn:entity", async (t) => {
+    const r = rig(t);
+    await r.run(new ScriptLlm(happyScript()));
+    const results = r.ev.of("tool_result").map((e) => e.result);
+    const local = results.find((x) => x.tool === "qloo_where_popular")!;
+    assert.equal(local.resultCount, 3);
+    assert.match(local.summary, /^Qloo returned 3 areas within Newark, NJ; the strongest has affinity 0\.71\.$/);
+    const trend = results.find((x) => x.tool === "qloo_trends")!;
+    assert.match(trend.summary, /returned 1 series/);
+    const recommend = results.find((x) => x.tool === "qloo_recommend")!;
+    assert.ok(recommend.preview.length > 0);
+    assert.ok(recommend.preview.every((p) => p.type === "book"), "subtype wins over the bare urn:entity type");
+    assert.ok(!JSON.stringify(lastReport(r)).includes('"type":"urn:entity"'));
   });
 
   it("never lets a title the tools did not return reach the output", async (t) => {
@@ -288,6 +310,71 @@ describe("agent loop: every Qloo status", () => {
     assert.equal(r.mcp.realCalls().length, 0, "nothing reached Qloo");
     assert.match(results[2]!.summary, /Unknown ref/);
     assert.match(results[1]!.summary, /signal_location/);
+  });
+});
+
+describe("agent loop: arguments the live API would reject", () => {
+  it("book trends are refused before Qloo with a message that says what to do instead", async (t) => {
+    const r = rig(t);
+    const llm = new ScriptLlm([
+      () => calls(plan(), rec(["Severance"])),
+      (req) => calls(toolCall("qloo_trends", { entities: [ref(req, "Piranesi")], entity_type: "book", start_date: "2026-01-01", end_date: "2026-09-30" })),
+      (req) => {
+        const text = req.messages.at(-1)?.content ?? "";
+        assert.match(String(text), /no trend data/);
+        assert.match(String(text), /tv_show/);
+        return calls(toolCall("qloo_trends", { entities: [ref(req, "Severance")], entity_type: "tv_show", start_date: "2026-01-01", end_date: "2026-09-30" }));
+      },
+      () => say("Done."),
+    ]);
+    await r.run(llm);
+    const trends = r.ev.of("tool_result").map((e) => e.result).filter((x) => x.tool === "qloo_trends");
+    assert.equal(trends.length, 2);
+    assert.equal(trends[0]!.error?.code, "INVALID_ARGUMENTS");
+    assert.equal(trends[1]!.status, "ok");
+    const real = r.mcp.realCalls().filter((c) => c.tool === "qloo_trends");
+    assert.equal(real.length, 1, "only the supported call reached Qloo");
+    assert.equal(real[0]!.args["entity_type"], "tv_show");
+  });
+
+  it("the fake upstream really rejects book trends (so the guard above is what keeps them off the screen)", async (t) => {
+    const r = rig(t);
+    const res = await r.mcp.service.call("qloo_trends", { entities: ["Piranesi"], entity_type: "book", start_date: "2026-01-01", end_date: "2026-09-30" });
+    assert.equal(res.envelope.status, "error");
+    assert.match(String(res.envelope.summary), /400/);
+  });
+
+  it("drops a limit passed to qloo_rank (which takes none) and tells the model, instead of failing the call", async (t) => {
+    const r = rig(t);
+    const llm = new ScriptLlm([
+      () => calls(plan(), rec(["Severance"])),
+      (req) => calls(toolCall("qloo_rank", { option_type: "book", options: [ref(req, "Piranesi"), ref(req, "Station Eleven")], signals: [ref(req, "Severance")], signal_location: PLACE, limit: 5 })),
+      (req) => {
+        const text = String(req.messages.at(-1)?.content ?? "");
+        assert.match(text, /Ignored argument \\"limit\\": qloo_rank does not take it/);
+        assert.match(text, /"status":"ok"/);
+        return say("Done.");
+      },
+    ]);
+    await r.run(llm);
+    const rank = r.ev.of("tool_result").map((e) => e.result).find((x) => x.tool === "qloo_rank")!;
+    assert.equal(rank.status, "ok");
+    const sent = r.mcp.realCalls().find((c) => c.tool === "qloo_rank")!;
+    assert.equal("limit" in sent.args, false);
+    assert.equal("limit" in (r.ev.of("tool_call").map((e) => e.call).find((c) => c.tool === "qloo_rank")?.args ?? {}), false);
+  });
+
+  it("still rejects other unknown arguments", async (t) => {
+    const r = rig(t);
+    const llm = new ScriptLlm([
+      () => calls(plan(), toolCall("qloo_rank", { option_type: "book", options: ["Piranesi"], signals: ["Severance"], sort: "desc" })),
+      () => say("Done."),
+    ]);
+    await r.run(llm);
+    const rank = r.ev.of("tool_result").map((e) => e.result).find((x) => x.tool === "qloo_rank")!;
+    assert.equal(rank.error?.code, "INVALID_ARGUMENTS");
+    assert.match(rank.summary, /unknown argument "sort"/);
+    assert.equal(r.mcp.realCalls().length, 0);
   });
 });
 

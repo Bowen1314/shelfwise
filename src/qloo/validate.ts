@@ -34,6 +34,31 @@ export interface ValidationResult {
   errors: string[];
 }
 
+/**
+ * Entity types Qloo's /v2/trending accepts. The published schema for qloo_trends also lists book, place and
+ * videogame, but the API rejects them with HTTP 400 ("filter.type must be one of urn:entity:actor, artist, brand,
+ * movie, person, podcast, tv_show"); actor is not in the tool's enum. So books never have a trend series.
+ */
+export const TREND_ENTITY_TYPES = ["tv_show", "movie", "artist", "podcast", "person", "brand"] as const;
+
+/**
+ * Arguments a model sometimes adds out of habit where the tool does not take them, and that cannot change the
+ * meaning of the call: `limit` on qloo_rank (it returns every option ranked). Dropped with a note to the model
+ * instead of failing the call. Everything else that is not in the schema is still rejected.
+ */
+const HARMLESS_EXTRA_ARGS = ["limit"];
+
+export function stripHarmlessArgs(tool: ToolDef, args: JsonObject): { args: JsonObject; dropped: string[] } {
+  const props = tool.inputSchema["properties"];
+  const declared = props !== null && typeof props === "object" ? Object.keys(props) : [];
+  if (tool.inputSchema["additionalProperties"] !== false) return { args, dropped: [] };
+  const dropped = HARMLESS_EXTRA_ARGS.filter((k) => k in args && !declared.includes(k));
+  if (!dropped.length) return { args, dropped };
+  const out: JsonObject = { ...args };
+  for (const k of dropped) delete out[k];
+  return { args: out, dropped };
+}
+
 /** Schema validation plus the few semantic rules the harness enforces by throwing (which would hide the reason). */
 export function validateToolArgs(tool: ToolDef, args: JsonObject): ValidationResult {
   const errors: string[] = [];
@@ -56,6 +81,13 @@ export function validateToolArgs(tool: ToolDef, args: JsonObject): ValidationRes
     if (typeof start === "string" && typeof end === "string") {
       if (!isCalendarDate(start) || !isCalendarDate(end)) errors.push("start_date and end_date must be real calendar dates (YYYY-MM-DD)");
       else if (start > end) errors.push("start_date must be on or before end_date");
+    }
+    const type = args["entity_type"];
+    if (typeof type === "string" && !(TREND_ENTITY_TYPES as readonly string[]).includes(type)) {
+      errors.push(
+        `entity_type "${type}" has no trend data in Qloo (supported: ${TREND_ENTITY_TYPES.join(", ")}). ` +
+          "Books cannot be trended: check trends on the shows, films, artists or podcasts patrons love instead, or skip trends.",
+      );
     }
   }
   if ((tool.name === "qloo_recommend" || tool.name === "qloo_rank") && args["demographic"] && !args["signal_location"]) {

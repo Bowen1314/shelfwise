@@ -10,7 +10,8 @@ import { TtlCache, cacheKey } from "../src/qloo/cache.js";
 import { TOOLS_SNAPSHOT, TOOLS_SNAPSHOT_HARNESS_VERSION } from "../src/qloo/fixtures/tools.snapshot.js";
 import { McpQlooClient, resolveQlooCommand } from "../src/qloo/mcp-client.js";
 import type { ToolDef } from "../src/qloo/types.js";
-import { isCalendarDate, schemaForLlm, validateToolArgs } from "../src/qloo/validate.js";
+import { TREND_ENTITY_TYPES, isCalendarDate, schemaForLlm, stripHarmlessArgs, validateToolArgs } from "../src/qloo/validate.js";
+import { EvidenceStore, entityTypeOf, normType } from "../src/agent/evidence.js";
 import { DEFAULT_LLM_BASE_URL, DEFAULT_LLM_MODEL, loadConfig, readinessProblems } from "../src/server/config.js";
 import { type AcquireResult, RunQueue } from "../src/server/queue.js";
 import { RateLimiter, clientIp } from "../src/server/ratelimit.js";
@@ -29,6 +30,28 @@ const tool = (name: string): ToolDef => {
 
 describe("summarizeSeries", () => {
   const pts = (values: number[], key = "popularity") => values.map((v, i) => ({ date: `2026-${String(i + 1).padStart(2, "0")}-01`, [key]: v }));
+
+  it("reads the live /v2/trending point shape: population_percentile is the level, the velocity fields are ignored", () => {
+    const live = (pcts: number[]) =>
+      pcts.map((p, i) => ({
+        date: `2026-${String(i + 3).padStart(2, "0")}-01`,
+        population_percentile: p,
+        population_rank: String(200 - i),
+        population_rank_velocity: 5,
+        velocity_fold_change: i % 2 ? 3 : -3,
+        population_percent_delta: 0.5,
+      }));
+    const steady = summarizeSeries(live([0.93, 0.93, 0.93, 0.93, 0.93, 0.93]));
+    assert.equal(steady.direction, "steady");
+    assert.match(steady.basis, /population_percentile/);
+    assert.equal(summarizeSeries(live([0.4, 0.42, 0.41, 0.6, 0.62, 0.61])).direction, "rising");
+    assert.equal(summarizeSeries(live([0.8, 0.8, 0.79, 0.5, 0.5, 0.49])).direction, "fading");
+    // Without the known key, the fallback still prefers a level whose name merely contains "lat" over a rate.
+    const renamed = live([0.4, 0.4, 0.4, 0.7, 0.7, 0.7]).map(({ population_percentile, ...rest }) => ({ ...rest, population_share: population_percentile }));
+    const r = summarizeSeries(renamed);
+    assert.equal(r.direction, "rising");
+    assert.match(r.basis, /population_share/);
+  });
 
   it("reports rising when the second half mean is more than 10% above the first", () => {
     const r = summarizeSeries(pts([0.3, 0.3, 0.3, 0.5, 0.5, 0.5]));
@@ -343,7 +366,7 @@ describe("validateToolArgs", () => {
   const rec = tool("qloo_recommend");
   const trends = tool("qloo_trends");
   const validRec = { target_type: "book", signals: ["Severance"], signal_location: "Newark, NJ", limit: 8 };
-  const validTrends = { entities: ["Piranesi"], entity_type: "book", start_date: "2025-10-01", end_date: "2026-10-01" };
+  const validTrends = { entities: ["Severance"], entity_type: "tv_show", start_date: "2025-10-01", end_date: "2026-10-01" };
 
   it("accepts a valid recommend call", () => {
     assert.deepEqual(validateToolArgs(rec, validRec), { ok: true, errors: [] });
@@ -441,6 +464,36 @@ describe("validateToolArgs", () => {
     assert.ok(r.errors.some((e) => e.startsWith("start_date ")), r.errors.join("|"));
   });
 
+  it("rejects trends on types Qloo's trending API cannot serve (books above all), naming the supported ones", () => {
+    for (const bad of ["book", "place", "videogame"]) {
+      const r = validateToolArgs(trends, { ...validTrends, entity_type: bad });
+      assert.equal(r.ok, false, bad);
+      assert.ok(r.errors.some((e) => e.includes(`"${bad}"`) && e.includes("no trend data") && e.includes("tv_show")), r.errors.join("|"));
+    }
+    for (const ok of TREND_ENTITY_TYPES) assert.equal(validateToolArgs(trends, { ...validTrends, entity_type: ok }).ok, true, ok);
+    assert.deepEqual([...TREND_ENTITY_TYPES].sort(), ["artist", "brand", "movie", "person", "podcast", "tv_show"]);
+    // The other tools keep accepting books.
+    assert.equal(validateToolArgs(tool("qloo_where_popular"), { entity: "Piranesi", entity_type: "book", within: "Newark, NJ" }).ok, true);
+  });
+
+  it("stripHarmlessArgs drops limit only where the tool does not declare it, and nothing else", () => {
+    const rank = tool("qloo_rank");
+    const args = { options: ["Piranesi"], option_type: "book", limit: 5 };
+    const out = stripHarmlessArgs(rank, args);
+    assert.deepEqual(out.dropped, ["limit"]);
+    assert.equal("limit" in out.args, false);
+    assert.equal("limit" in args, true, "the input is not mutated");
+    assert.equal(validateToolArgs(rank, out.args).ok, true);
+    // Declared limits stay (and are still range-checked).
+    const kept = stripHarmlessArgs(rec, { ...validRec, limit: 99 });
+    assert.deepEqual(kept.dropped, []);
+    assert.equal(validateToolArgs(rec, kept.args).ok, false);
+    // Other unknown arguments are left for validation to reject.
+    const other = stripHarmlessArgs(rank, { ...args, sort: "desc" });
+    assert.deepEqual(other.dropped, ["limit"]);
+    assert.equal(validateToolArgs(rank, other.args).ok, false);
+  });
+
   it("applies the trends date rules only to qloo_trends", () => {
     const describe_ = tool("qloo_describe");
     assert.equal(validateToolArgs(describe_, { entity: "Dune" }).ok, true);
@@ -470,6 +523,103 @@ describe("validateToolArgs", () => {
 // ------------------------------------------------------------------------------------------------
 // loadConfig / readinessProblems
 // ------------------------------------------------------------------------------------------------
+
+// ------------------------------------------------------------------------------------------------
+// Live result shapes in the evidence store
+// ------------------------------------------------------------------------------------------------
+
+describe("entity types from live rows", () => {
+  it("normType strips the URN prefix and treats the bare urn:entity as no type", () => {
+    assert.equal(normType("urn:entity:book"), "book");
+    assert.equal(normType("urn:entity:tv_show"), "tv_show");
+    assert.equal(normType("Book"), "book");
+    assert.equal(normType("urn:entity"), undefined);
+    assert.equal(normType(""), undefined);
+    assert.equal(normType(undefined), undefined);
+  });
+
+  it("entityTypeOf prefers the specific subtype over a bare urn:entity type", () => {
+    assert.equal(entityTypeOf({ type: "urn:entity", subtype: "urn:entity:book" }), "book");
+    assert.equal(entityTypeOf({ type: "urn:entity:movie" }), "movie");
+    assert.equal(entityTypeOf({ type: "urn:entity", types: ["urn:entity:podcast"] }), "podcast");
+    assert.equal(entityTypeOf({ type: "urn:entity" }), undefined);
+  });
+
+  it("books from a live recommend result are typed book, and a bare type falls back to the call's target type", () => {
+    const store = new EvidenceStore();
+    const rec = store.addCall({
+      callId: "c1",
+      tool: "qloo_recommend",
+      args: { target_type: "book", signals: ["Severance"] },
+      envelope: {
+        status: "ok",
+        interpretation: { target_type: "urn:entity:book", signals: [{ input: "Severance", entityId: "s1", name: "Severance", type: "urn:entity:tv_show" }] },
+        results: [
+          { entity_id: "b1", name: "Piranesi", type: "urn:entity", subtype: "urn:entity:book" },
+          { entity_id: "b2", name: "Dark Matter", type: "urn:entity" },
+        ],
+      },
+      durationMs: 1,
+      cached: false,
+      sample: false,
+    });
+    assert.deepEqual(rec.view.preview.map((p) => p.type), ["book", "book"]);
+    assert.equal(rec.resolved[0]?.entity.type, "tv_show");
+    assert.equal(rec.view.summary, "recommend returned 2 items.");
+  });
+});
+
+describe("where_popular summary", () => {
+  const heat = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ location: { geohash: `dr5r${i}` }, query: { affinity: Number((0.9 - i * 0.01).toFixed(2)) } }));
+  const add = (store: EvidenceStore, results: unknown[], status: "ok" | "empty" = "ok") =>
+    store.addCall({
+      callId: store.nextCallId(),
+      tool: "qloo_where_popular",
+      args: { entity: "b1", entity_type: "book", within: "Newark, NJ" },
+      // The live harness sends no `summary` here.
+      envelope: { status, interpretation: { entity: { input: "b1", entityId: "b1", name: "Piranesi", type: "urn:entity:book" }, within: "Newark, NJ" }, results, result_count: results.length },
+      durationMs: 1,
+      cached: false,
+      sample: false,
+    });
+
+  it("reports the heatmap areas instead of '0 items'", () => {
+    const rec = add(new EvidenceStore(), heat(10));
+    assert.equal(rec.view.resultCount, 10);
+    assert.equal(rec.view.summary, "Qloo returned 10 areas within Newark, NJ; the strongest has affinity 0.9.");
+    assert.equal(rec.local?.areas, 10);
+  });
+
+  it("keeps a summary the harness did send, and says so when nothing came back", () => {
+    const store = new EvidenceStore();
+    const withSummary = store.addCall({
+      callId: store.nextCallId(),
+      tool: "qloo_where_popular",
+      args: { entity: "b1", within: "Newark, NJ" },
+      envelope: { status: "ok", summary: "Harness summary.", interpretation: { entity: { input: "b1", entityId: "b1", name: "Piranesi" }, within: "Newark, NJ" }, results: heat(2) },
+      durationMs: 1,
+      cached: false,
+      sample: false,
+    });
+    assert.equal(withSummary.view.summary, "Harness summary.");
+    assert.equal(add(store, [], "empty").view.summary, "Qloo returned no matches.");
+  });
+
+  it("falls back to the reported result_count for tools Shelfwise does not parse", () => {
+    const store = new EvidenceStore();
+    const rec = store.addCall({
+      callId: store.nextCallId(),
+      tool: "qloo_audience_demographics",
+      args: { entity: "Severance" },
+      envelope: { status: "ok", results: [{ age: "25_to_29" }, { age: "30_to_34" }, { age: "35_and_younger" }], result_count: 3 },
+      durationMs: 1,
+      cached: false,
+      sample: false,
+    });
+    assert.equal(rec.view.summary, "audience_demographics returned 3 items.");
+  });
+});
 
 describe("loadConfig", () => {
   it("has the documented defaults and no problems for an empty environment", () => {

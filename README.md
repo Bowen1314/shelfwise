@@ -31,7 +31,7 @@ back three things you can use the same day:
 
 1. **A bridge shelf**: printable "Loved *X*? Try *Y*" shelf-talker cards, several per page.
 2. **A buy / feature list**: titles in rank order, each with its evidence (which signals it matched, where it
-   ranked, local fit, trend direction).
+   ranked, local fit, and whether interest in the show or artist behind it is rising).
 3. **Programme ideas**: two or three event or display ideas tied to the same evidence.
 
 A follow-up chat re-runs the relevant Qloo calls ("make it for teens", "more translated fiction").
@@ -48,7 +48,7 @@ rank, local-fit value and trend direction that reaches the screen is read from a
 | Find books for each thing patrons love | `qloo_recommend` (`target_type: book`), one call **per signal** | Cross-domain recommendations: books that fans of a TV show, album or game also love. One signal per call means "Loved *X*? Try *Y*" is true by construction. |
 | Rank for the audience | `qloo_rank` | Orders the shortlist for the chosen age band and place. |
 | Check local fit | `qloo_where_popular`, `signal_location` | Whether the pick has heat near the library or shop, and a place-weighted recommendation. |
-| Check trends | `qloo_trends` | Time series per title; Shelfwise computes rising / steady / fading itself from the points. |
+| Check trends | `qloo_trends` on the loved signals | Time series for the shows, films, artists or podcasts patrons love (Qloo has no trend data for books); Shelfwise computes rising / steady / fading itself from the points and shows it as "interest in X" next to the titles X returned. |
 | Look for a bridging title | `qloo_compare_audiences` | A book both groups of fans reach. |
 
 Also available to the model: `qloo_entity_tags`, `qloo_find_tags`, `qloo_audience_demographics`.

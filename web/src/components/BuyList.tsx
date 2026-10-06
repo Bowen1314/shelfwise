@@ -12,7 +12,7 @@ function Muted({ children }: { children: string }) {
 
 function EvidenceBlock({ item }: { item: BuyItem }) {
   const { evidence } = item;
-  const { rank, localFit, trend } = evidence;
+  const { rank, localFit, trend, signalTrends } = evidence;
   return (
     <dl className="evidence">
       <div className="evidence__row">
@@ -92,11 +92,17 @@ function EvidenceBlock({ item }: { item: BuyItem }) {
               <TrendChip direction={trend.direction} /> <CiteButton callId={trend.callId} />
               <span className="evidence__fine">{trend.basis}</span>
             </>
+          ) : signalTrends && signalTrends.length > 0 ? (
+            <ul className="evidence__list">
+              {signalTrends.map((t) => (
+                <li key={`${t.callId}-${t.entity.handle}`}>
+                  Interest in <strong>{t.entity.name}</strong> <TrendChip direction={t.direction} /> <CiteButton callId={t.callId} />
+                  <span className="evidence__fine">{t.basis}</span>
+                </li>
+              ))}
+            </ul>
           ) : (
-            <>
-              <TrendChip direction="unknown" />
-              <span className="evidence__fine">No trend series was checked for this title.</span>
-            </>
+            <Muted>Qloo has no trend data for books, and no trend was checked for the signals behind this title.</Muted>
           )}
         </dd>
       </div>

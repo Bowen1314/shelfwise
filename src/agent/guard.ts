@@ -9,6 +9,7 @@ import {
   type ProgrammeKind,
   type Report,
   type ReportNote,
+  type TrendSummary,
 } from "../shared/types.js";
 import { type CallRecord, type EntityRecord, EvidenceStore, normName, toRef } from "./evidence.js";
 
@@ -177,6 +178,16 @@ export function buyEvidence(store: EvidenceStore, book: EntityRecord): { evidenc
       }
     }
   }
+  // Trends are checked on the things patrons love (Qloo has no trend data for books): join the latest series for
+  // each matched signal.
+  const signalTrends = new Map<string, TrendSummary>();
+  for (const call of store.allCalls()) {
+    if (call.tool !== "qloo_trends" || call.status === "error" || call.status === "needs_input") continue;
+    for (const t of call.trends) if (matched.has(t.entity.handle)) signalTrends.set(t.entity.handle, t);
+  }
+  for (const t of signalTrends.values()) {
+    if (!cites.some((c) => c.callId === t.callId)) cites.push({ callId: t.callId, tool: "qloo_trends", label: `trends: ${t.entity.name} ${t.direction}` });
+  }
   return {
     evidence: {
       matchedSignals: [...matched.values()],
@@ -184,6 +195,7 @@ export function buyEvidence(store: EvidenceStore, book: EntityRecord): { evidenc
       ...(rank ? { rank } : {}),
       ...(localFit ? { localFit } : {}),
       ...(trend ? { trend } : {}),
+      ...(signalTrends.size ? { signalTrends: [...signalTrends.values()] } : {}),
       reduced,
     },
     cites,

@@ -1,3 +1,4 @@
+import { TREND_ENTITY_TYPES } from "../qloo/validate.js";
 import type { ChatMessage, ChatRequest, ChatResponse, LlmClient, ToolCall } from "./llm.js";
 
 /**
@@ -80,6 +81,7 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "");
 interface Rec {
   sigRef: string;
   sigName: string;
+  sigType: string;
   books: { ref: string; name: string; id: string }[];
 }
 
@@ -93,6 +95,7 @@ function recsFrom(calls: CallInfo[]): Rec[] {
     out.set(str(sig["ref"]), {
       sigRef: str(sig["ref"]),
       sigName: str(sig["name"]),
+      sigType: str(sig["type"]),
       books: arr(c.digest["results"]).map((r) => ({ ref: str(r["ref"]), name: str(r["name"]), id: str(r["id"]) })),
     });
   }
@@ -175,7 +178,7 @@ export class ScriptedDemoLlm implements LlmClient {
                 { title: "Find books for fans of each thing patrons love", tool: "qloo_recommend" },
                 { title: "Rank the shortlist for this audience", tool: "qloo_rank" },
                 { title: "Check local fit for the top picks", tool: "qloo_where_popular" },
-                { title: "Check which picks are rising or fading", tool: "qloo_trends" },
+                { title: "Check whether interest in those signals is rising", tool: "qloo_trends" },
                 { title: "Write the shelf, buy list and programme ideas" },
               ],
             }),
@@ -204,7 +207,13 @@ export class ScriptedDemoLlm implements LlmClient {
         ranked.slice(0, 2).forEach((ref) => calls.push(call("qloo_where_popular", { entity: ref, entity_type: "book", within: form.place })));
         const end = new Date().toISOString().slice(0, 10);
         const startDate = `${Number(end.slice(0, 4)) - 1}${end.slice(4)}`;
-        if (ranked.length) calls.push(call("qloo_trends", { entities: ranked.slice(0, 5), entity_type: "book", start_date: startDate, end_date: end }));
+        // Qloo has no trend data for books: trend the signals patrons love, one call per supported type.
+        const byType = new Map<string, string[]>();
+        for (const r of recs) {
+          if (!(TREND_ENTITY_TYPES as readonly string[]).includes(r.sigType)) continue;
+          byType.set(r.sigType, [...(byType.get(r.sigType) ?? []), r.sigRef].slice(0, 5));
+        }
+        for (const [type, refs] of byType) calls.push(call("qloo_trends", { entities: refs, entity_type: type, start_date: startDate, end_date: end, limit: 20 }));
         if (recs.length >= 2) calls.push(call("qloo_compare_audiences", { group_a: [recs[0]!.sigRef], group_b: [recs[1]!.sigRef], target_type: "book", limit: 5 }));
         return { content: "Checking local fit, trends and a bridging title.", toolCalls: calls };
       }
@@ -231,10 +240,11 @@ export class ScriptedDemoLlm implements LlmClient {
       const bits = [`{${ref}} ranked ${ORDINALS[i] ?? "high"} for this audience`];
       const k = countFor(ref);
       if (k > 0) bits.push(`and came back for ${NUMBER_WORDS[Math.min(k, 4)]} of your signals`);
-      const dir = trendOf.get(ref);
-      if (dir && dir !== "unknown") bits.push(`with a ${dir} trend`);
-      else if (dir === "unknown") bits.push("though its trend could not be determined");
       if (localOf.has(ref)) bits.push("and local heat returned for your area");
+      // A direction is only ever said about the signal its trends entry names, never about the book.
+      const trended = recs.find((r) => r.books.some((b) => b.ref === ref) && trendOf.has(r.sigRef));
+      const dir = trended ? trendOf.get(trended.sigRef) : undefined;
+      if (trended && dir && dir !== "unknown") bits.push(`while interest in {${trended.sigRef}} is ${dir}`);
       return { book_ref: ref, rationale: `${bits.join(", ")}.` };
     });
 

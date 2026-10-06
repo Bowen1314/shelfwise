@@ -13,7 +13,11 @@ import type { TrendDirection } from "../shared/types.js";
 export const TREND_THRESHOLD = 0.1;
 
 const DATE_KEYS = ["date", "day", "week", "month", "period", "timestamp", "time", "start_date", "end_date"];
-const METRIC_KEYS = ["popularity", "trending_score", "trend_score", "score", "value", "count", "affinity"];
+// Live /v2/trending points are { date, population_percentile, population_rank (a string), population_rank_velocity,
+// velocity_fold_change, population_percent_delta }: the percentile is the level to compare; the others are rates.
+const METRIC_KEYS = ["population_percentile", "popularity", "trending_score", "trend_score", "score", "value", "count", "affinity"];
+/** Never used as the fallback metric: coordinates, ranks, ids, and rates of change (which are not levels). */
+const NOT_A_LEVEL = /(^|_)(lat|lon|lng|latitude|longitude)(_|$)|rank|velocity|delta|fold_change|id$/i;
 const NESTED_KEYS = ["query", "metrics", "stats"];
 const DATE_LIKE = /^\d{4}-\d{2}(-\d{2})?/;
 
@@ -59,7 +63,7 @@ export function summarizeSeries(points: unknown[]): SeriesSummary {
   const metricKey =
     METRIC_KEYS.find((k) => withDate.filter((r) => typeof r[k] === "number" && Number.isFinite(r[k])).length >= 3) ??
     Object.keys(withDate[0] ?? {}).find(
-      (k) => k !== dateKey && !/lat|lon|rank|id$/i.test(k) && withDate.filter((r) => typeof r[k] === "number" && Number.isFinite(r[k])).length >= 3,
+      (k) => k !== dateKey && !NOT_A_LEVEL.test(k) && withDate.filter((r) => typeof r[k] === "number" && Number.isFinite(r[k])).length >= 3,
     );
   if (!metricKey) {
     return { direction: "unknown", basis: `Qloo returned ${n} dated points but no numeric metric Shelfwise recognises.`, points: n };

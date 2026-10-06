@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { type HealthResponse, LIMITS_LINE, SAMPLE_DATA_LABEL } from "@shared/types";
 import { sampleBannerDetail, sampleBannerPlanner } from "../lib/banner";
-import { Icon, LogoMark } from "./Icon";
+import { Icon, LogoMark, type IconName } from "./Icon";
 
 /** Persistent strip shown whenever the server runs on sample (fixture) data. */
 export function SampleBanner({ llm }: { llm?: HealthResponse["llm"] | undefined }) {
@@ -17,7 +17,55 @@ export function SampleBanner({ llm }: { llm?: HealthResponse["llm"] | undefined 
   );
 }
 
-export function Header({ narrow }: { narrow: boolean }) {
+/** The workspace views. The app has no router: App holds the current one. */
+export type View = "build" | "recent" | "print";
+
+const NAV_ITEMS: { id: View; label: string; short: string; icon: IconName }[] = [
+  { id: "build", label: "Build a shelf", short: "Build", icon: "shelf" },
+  { id: "recent", label: "Recent runs", short: "Recent", icon: "clock" },
+  { id: "print", label: "Print desk", short: "Print", icon: "printer" },
+];
+
+interface HeaderProps {
+  narrow: boolean;
+  view: View;
+  onNavigate: (view: View) => void;
+  /** Last part of the breadcrumb, e.g. "New shelf". */
+  crumb: string;
+}
+
+/**
+ * Workspace navigation. Each item keeps its full name as text: the rail (below 1024px) and the top bar (720px and
+ * below) hide it visually but not from assistive technology, and show an icon and a short word instead.
+ */
+function WorkspaceNav({ view, onNavigate }: Pick<HeaderProps, "view" | "onNavigate">) {
+  return (
+    <nav className="sidebar-nav" aria-label="Workspace sections">
+      {NAV_ITEMS.map((item) => {
+        const active = item.id === view;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className={`sidebar-nav__item${active ? " sidebar-nav__item--active" : ""}`}
+            aria-current={active ? "page" : undefined}
+            title={item.label}
+            onClick={() => onNavigate(item.id)}
+          >
+            {active && <span className="sidebar-nav__dot" aria-hidden="true" />}
+            <Icon name={item.icon} className="sidebar-nav__icon" />
+            <span className="sidebar-nav__label">{item.label}</span>
+            <span className="sidebar-nav__short" aria-hidden="true">
+              {item.short}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function Header({ narrow, view, onNavigate, crumb }: HeaderProps) {
   return (
     <>
       <aside className="workspace-sidebar" aria-label="Shelfwise workspace">
@@ -32,11 +80,7 @@ export function Header({ narrow }: { narrow: boolean }) {
           </div>
         </div>
         <p className="sidebar-label">Workspace</p>
-        <nav className="sidebar-nav" aria-label="Workspace sections">
-          <span className="sidebar-nav__item sidebar-nav__item--active"><span className="sidebar-nav__dot" aria-hidden="true" />Build a shelf</span>
-          <span className="sidebar-nav__item">Recent runs</span>
-          <span className="sidebar-nav__item">Print desk</span>
-        </nav>
+        <WorkspaceNav view={view} onNavigate={onNavigate} />
         <div className="sidebar-footer">
           <div className="header-signal" aria-label="Shelfwise is ready">
             <span className="header-signal__dot" aria-hidden="true" />
@@ -47,7 +91,7 @@ export function Header({ narrow }: { narrow: boolean }) {
       </aside>
       <header className={`site-header${narrow ? " site-header--narrow" : ""}`}>
         <div className="content-topbar">
-          <div className="content-topbar__crumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>{narrow ? "New shelf" : "Shelf report"}</strong></div>
+          <div className="content-topbar__crumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>{crumb}</strong></div>
           <div className="content-topbar__actions">
             <div className="content-topbar__meta">Qloo taste graph <span aria-hidden="true">·</span> grounded recommendations</div>
             <ThemeToggle />

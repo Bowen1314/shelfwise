@@ -17,10 +17,25 @@ const asRec = (v: unknown): Rec | undefined => (v !== null && typeof v === "obje
 const asStr = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
 const asNum = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
-/** `urn:entity:book` -> `book` */
+/**
+ * `urn:entity:book` -> `book`. The bare `urn:entity` (what Qloo puts in `type` on insights results, with the real
+ * type in `subtype`) says nothing, so it maps to undefined and callers fall back to a more specific field.
+ */
 export function normType(t: unknown): string | undefined {
-  const s = asStr(t);
-  return s ? s.replace(/^urn:entity:/i, "").toLowerCase() : undefined;
+  const s = asStr(t)?.trim().toLowerCase();
+  if (!s || s === "urn:entity" || s === "entity") return undefined;
+  const bare = s.replace(/^urn:entity:/, "");
+  return bare.length > 0 && !bare.startsWith("urn:") ? bare : undefined;
+}
+
+/** The most specific entity type on a Qloo row: `subtype`, `type` or `types[]`, whichever is not the bare `urn:entity`. */
+export function entityTypeOf(row: Record<string, unknown>): string | undefined {
+  const types = Array.isArray(row["types"]) ? (row["types"] as unknown[]) : [];
+  for (const t of [row["subtype"], row["type"], ...types]) {
+    const n = normType(t);
+    if (n) return n;
+  }
+  return undefined;
 }
 
 /** Lowercase, strip diacritics/punctuation, collapse spaces. Used to compare names across Qloo results and prose. */
@@ -303,7 +318,7 @@ export class EvidenceStore {
     const id = asStr(o["entityId"]);
     const name = asStr(o["name"]);
     if (id && name) {
-      const entity = this.ensure(id, name, normType(o["type"]));
+      const entity = this.ensure(id, name, entityTypeOf(o));
       rec.resolved.push({ input: asStr(o["input"]) ?? name, field, entity });
       return;
     }
@@ -319,7 +334,7 @@ export class EvidenceStore {
       const name = asStr(row["name"]);
       if (!name) continue;
       const id = asStr(row["entity_id"]) ?? asStr(row["id"]);
-      entities.push({ e: this.ensure(id, name, normType(row["type"]) ?? rec.targetType, yearOf(row)), row });
+      entities.push({ e: this.ensure(id, name, entityTypeOf(row) ?? rec.targetType, yearOf(row)), row });
     }
     entities.forEach(({ e, row }, i) => {
       const query = asRec(row["query"]);
@@ -351,7 +366,7 @@ export class EvidenceStore {
       if (name && id) {
         const q = asRec(o["query"]);
         const affinity = asNum(o["affinity"]) ?? asNum(q?.["affinity"]);
-        found.push({ e: this.ensure(id, name, normType(o["type"]) ?? rec.targetType, yearOf(o)), ...(affinity !== undefined ? { affinity } : {}) });
+        found.push({ e: this.ensure(id, name, entityTypeOf(o) ?? rec.targetType, yearOf(o)), ...(affinity !== undefined ? { affinity } : {}) });
         return;
       }
       for (const x of Object.values(o)) if (typeof x === "object") walk(x, depth + 1);
@@ -409,7 +424,7 @@ export class EvidenceStore {
       const id = asStr(ent?.["entityId"]);
       const name = asStr(ent?.["name"]);
       if (!s || !ent || !name) continue;
-      const entity = this.ensure(id, name, normType(ent["type"]) ?? rec.targetType);
+      const entity = this.ensure(id, name, entityTypeOf(ent) ?? rec.targetType);
       entity.appearances.push({ callId: rec.callId, tool: rec.tool, role: "input" });
       const sum = summarizeSeries(Array.isArray(s["points"]) ? (s["points"] as unknown[]) : []);
       rec.trends.push({
@@ -490,7 +505,7 @@ export class EvidenceStore {
           {
             id,
             name,
-            ...(normType(cr["type"]) ? { type: normType(cr["type"]) as string } : {}),
+            ...(entityTypeOf(cr) ? { type: entityTypeOf(cr) as string } : {}),
             ...(asStr(cr["description"]) ? { description: (asStr(cr["description"]) as string).slice(0, 240) } : {}),
             ...(year !== undefined ? { releaseYear: year } : {}),
             ...(asNum(cr["popularity"]) !== undefined ? { popularity: asNum(cr["popularity"]) as number } : {}),
@@ -540,14 +555,24 @@ export class EvidenceStore {
   }
 }
 
+/** The harness sends no `summary` on successful results, so most live calls are summarised here. */
 function defaultSummary(rec: CallRecord): string {
   switch (rec.status) {
     case "empty":
       return "Qloo returned no matches.";
     case "error":
       return "The call failed.";
-    default:
-      return `${rec.tool.replace(/^qloo_/, "")} returned ${rec.results.length || rec.tags.length || rec.trends.length || 0} items.`;
+    default: {
+      if (rec.local) return rec.local.summary;
+      const op = rec.tool.replace(/^qloo_/, "");
+      if (rec.trends.length) {
+        const known = rec.trends.filter((t) => t.direction !== "unknown").length;
+        return `${op} returned ${rec.trends.length} series; Shelfwise could read a direction for ${known} of them.`;
+      }
+      const reported = typeof rec.envelope.result_count === "number" ? rec.envelope.result_count : 0;
+      const n = rec.results.length || rec.tags.length || reported;
+      return `${op} returned ${n} item${n === 1 ? "" : "s"}.`;
+    }
   }
 }
 

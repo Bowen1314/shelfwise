@@ -1,7 +1,7 @@
 import type { AgentEvent, DoneReason, PlanStep, ResolutionChoice, ResolutionIssue } from "../shared/types.js";
 import type { JsonObject, QlooEnvelope, ToolDef } from "../qloo/types.js";
 import type { QlooService } from "../qloo/service.js";
-import { validateToolArgs } from "../qloo/validate.js";
+import { stripHarmlessArgs, validateToolArgs } from "../qloo/validate.js";
 import { digestFor, labelFor } from "./evidence.js";
 import { type GuardContext, checkSubmission, extractJsonObject } from "./guard.js";
 import { type ChatMessage, type ChatResponse, type LlmClient, LlmError, type ToolCall, type ToolChoice, type ToolSpec } from "./llm.js";
@@ -204,19 +204,22 @@ export async function runAgent(
       });
 
       const expanded = store.expandHandles(args);
+      const stripped = stripHarmlessArgs(tool, expanded.args);
+      const callArgs = stripped.args;
+      const notes: string[] = stripped.dropped.map((k) => `Ignored argument "${k}": ${tool.name} does not take it.`);
       let problem: string | undefined;
       if (expanded.unknown.length) problem = `Unknown ref(s) ${expanded.unknown.join(", ")}: refs must come from tool results in this conversation.`;
-      const validation = problem ? { ok: false, errors: [problem] } : validateToolArgs(tool, expanded.args);
-      emit({ type: "tool_call", call: { callId, tool: tool.name, args: expanded.args, label: labelFor(tool.name, expanded.args, store) } });
+      const validation = problem ? { ok: false, errors: [problem] } : validateToolArgs(tool, callArgs);
+      emit({ type: "tool_call", call: { callId, tool: tool.name, args: callArgs, label: labelFor(tool.name, callArgs, store) } });
 
       if (!validation.ok) {
         const env = failure("INVALID_ARGUMENTS", `The arguments were rejected before calling Qloo: ${validation.errors.join("; ")}`, "Fix the arguments to match the tool schema and try again.");
-        const rec = store.addCall({ callId, tool: tool.name, args: expanded.args, envelope: env, durationMs: 0, cached: false, sample: deps.sample });
+        const rec = store.addCall({ callId, tool: tool.name, args: callArgs, envelope: env, durationMs: 0, cached: false, sample: deps.sample });
         emit({ type: "tool_result", result: rec.view });
-        return { content: digestFor(rec) };
+        return { content: digestFor(rec, notes) };
       }
 
-      let result = await qloo.call(tool.name, expanded.args, signal);
+      let result = await qloo.call(tool.name, callArgs, signal);
       for (let attempt = 0; attempt < limits.maxRetries; attempt++) {
         const err = result.envelope.error;
         if (result.envelope.status !== "error" || !err?.retryable || signal.aborted) break;
@@ -224,13 +227,13 @@ export async function runAgent(
         emit({ type: "retry", callId, attempt: attempt + 1, delayMs: delay, reason: `${err.code}: ${result.envelope.summary ?? "retryable error"}` });
         await sleep(delay, signal);
         if (signal.aborted) break;
-        result = await qloo.call(tool.name, expanded.args, signal);
+        result = await qloo.call(tool.name, callArgs, signal);
       }
 
       const rec = store.addCall({
         callId,
         tool: tool.name,
-        args: expanded.args,
+        args: callArgs,
         envelope: result.envelope,
         durationMs: result.durationMs,
         cached: result.cached,
@@ -239,7 +242,6 @@ export async function runAgent(
       emit({ type: "tool_result", result: rec.view });
       if (rec.status === "ok" || rec.status === "partial" || rec.status === "degraded") session.unreportedCalls += 1;
 
-      const notes: string[] = [];
       if (rec.status === "empty") notes.push("No results. Broaden once (drop a filter or rephrase) before giving up.");
       if (rec.status === "partial" || rec.status === "degraded") notes.push(`Lower-confidence result (${rec.status}); the report will flag it.`);
 
