@@ -276,11 +276,13 @@ export class ScriptedDemoLlm implements LlmClient {
         signal_refs: [lead.sigRef],
       });
     }
-    if (orderedRefs.length >= 3) {
+    if (orderedRefs.length > 0) {
+      const shown = orderedRefs.slice(0, 3).map((r) => `{${r}}`);
+      const listed = shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}` : shown[0];
       programmes.push({
         kind: "themed_display",
         title: "If you liked it on screen: a face-out display",
-        description: `Face out {${orderedRefs[0]}}, {${orderedRefs[1]}} and {${orderedRefs[2]}} with the shelf-talkers from this report beside the matching titles.`,
+        description: `Face out ${listed} with the shelf-talkers from this report beside the matching titles.`,
         book_refs: orderedRefs.slice(0, 3),
         signal_refs: recs.slice(0, 2).map((r) => r.sigRef),
       });

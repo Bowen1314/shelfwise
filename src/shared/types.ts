@@ -241,7 +241,7 @@ export interface BridgeCard {
   /** What patrons already love (resolved Qloo entities). "Loved [loved]? Try [book]." */
   loved: EntityRef[];
   book: EntityRef;
-  /** One line, model-written, placeholders already expanded to returned titles. */
+  /** One line, placeholders already expanded to returned titles. Model-written, or a fixed sentence for a buy-list book the model left off. */
   why: string;
   cites: Cite[];
   reduced: boolean;

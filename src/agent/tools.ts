@@ -58,7 +58,8 @@ const submitReport: ToolSpec = {
       properties: {
         bridge_shelf: {
           type: "array",
-          maxItems: 12,
+          maxItems: 20,
+          description: "One card for every book in buy_list, plus any other strong pairings.",
           items: {
             type: "object",
             additionalProperties: false,
@@ -86,7 +87,7 @@ const submitReport: ToolSpec = {
         },
         programmes: {
           type: "array",
-          minItems: 1,
+          minItems: 3,
           maxItems: 3,
           items: {
             type: "object",

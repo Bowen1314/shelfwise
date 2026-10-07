@@ -45,6 +45,12 @@ function rig(t: TestContext, opts: FakeMcpOptions & { limits?: Partial<typeof LI
 const plan = () => toolCall("set_plan", { steps: [{ title: "Find books for each thing patrons love", tool: "qloo_recommend" }, { title: "Rank the shortlist", tool: "qloo_rank" }] });
 const rec = (signals: string[], extra: Record<string, unknown> = {}) => toolCall("qloo_recommend", { target_type: "book", signals, signal_location: PLACE, limit: 8, ...extra });
 
+/** Two more plain programme ideas, so a submission carries the three the guard asks for. */
+const morePrograms = (signal: string) => [
+  { kind: "book_club", title: "Readers circle", description: `A reading group for fans of {${signal}}.`, signal_refs: [signal] },
+  { kind: "other", title: "Picks wall", description: `A wall of picks for fans of {${signal}}.`, signal_refs: [signal] },
+];
+
 /** A complete, valid report built only from refs the model was shown. */
 function goodSubmission(req: ChatRequest): Record<string, unknown> {
   const sev = ref(req, "Severance");
@@ -62,7 +68,7 @@ function goodSubmission(req: ChatRequest): Record<string, unknown> {
       { book_ref: se, rationale: `{${se}} also came back for readers of {${sev}}.` },
       { book_ref: hm, rationale: `{${hm}} came back for readers of {${bear}}.` },
     ],
-    programmes: [{ kind: "film_night", title: "Watch and borrow", description: `Show a clip of {${sev}}, then offer {${pir}} at the desk.`, book_refs: [pir], signal_refs: [sev] }],
+    programmes: [{ kind: "film_night", title: "Watch and borrow", description: `Show a clip of {${sev}}, then offer {${pir}} at the desk.`, book_refs: [pir], signal_refs: [sev] }, ...morePrograms(sev)],
   };
 }
 
@@ -108,9 +114,17 @@ describe("agent loop: the workflow", () => {
     const report = lastReport(r);
     assert.equal(report.sample, false);
     assert.equal(report.audience, "Whole community (no age focus)");
-    assert.equal(report.bridgeShelf.length, 2);
+    assert.equal(report.bridgeShelf.length, 3, "two model cards plus one joined for the buy-list book the model left off");
     assert.equal(report.buyList.length, 3);
-    assert.equal(report.programmes.length, 1);
+    assert.equal(report.programmes.length, 3);
+
+    // Every buy-list book gets a shelf-talker; the one the model skipped is joined from the call that returned it.
+    const joined = report.bridgeShelf[2]!;
+    assert.equal(joined.book.name, "Station Eleven");
+    assert.deepEqual(joined.loved.map((l) => l.name), ["Severance"]);
+    assert.match(joined.why, /^Station Eleven came back for fans of Severance\.$/);
+    assert.ok(joined.cites.length > 0 && joined.cites.every((c) => c.tool === "qloo_recommend" || c.tool === "qloo_rank"));
+    assert.deepEqual(new Set(report.bridgeShelf.map((c) => c.book.name)), new Set(report.buyList.map((b) => b.book.name)));
 
     // Bridge cards are true by construction: each pairing cites a call that used that very signal.
     const card = report.bridgeShelf[0]!;
@@ -190,7 +204,7 @@ function goodSubmissionFor(req: ChatRequest): Record<string, unknown> {
   return {
     bridge_shelf: [{ loved_refs: [sev], book_ref: pir, why: `{${pir}} came back for fans of {${sev}}.` }],
     buy_list: [{ book_ref: pir, rationale: `{${pir}} came back for readers of {${sev}}.` }],
-    programmes: [{ kind: "themed_display", title: "Shelf of the week", description: `Display {${pir}} beside a note about {${sev}}.`, book_refs: [pir], signal_refs: [sev] }],
+    programmes: [{ kind: "themed_display", title: "Shelf of the week", description: `Display {${pir}} beside a note about {${sev}}.`, book_refs: [pir], signal_refs: [sev] }, ...morePrograms(sev)],
   };
 }
 
@@ -224,7 +238,7 @@ describe("agent loop: every Qloo status", () => {
               { loved_refs: [ref(req, "Degradedo")], book_ref: ref(req, "Crying in H Mart"), why: `{${ref(req, "Crying in H Mart")}} came back for fans of {${ref(req, "Degradedo")}}.` },
             ],
             buy_list: [{ book_ref: ref(req, "Kitchen Confidential"), rationale: `{${ref(req, "Kitchen Confidential")}} came back for {${ref(req, "Partialo")}} readers.` }],
-            programmes: [{ kind: "other", title: "Pop-up table", description: `A table for fans of {${ref(req, "Partialo")}}.`, signal_refs: [ref(req, "Partialo")] }],
+            programmes: [{ kind: "other", title: "Pop-up table", description: `A table for fans of {${ref(req, "Partialo")}}.`, signal_refs: [ref(req, "Partialo")] }, ...morePrograms(ref(req, "Partialo"))],
           }),
         ),
     ]);
@@ -384,7 +398,7 @@ function flakySubmission(req: ChatRequest): Record<string, unknown> {
   return {
     bridge_shelf: [{ loved_refs: [f], book_ref: pir, why: `{${pir}} came back for fans of {${f}}.` }],
     buy_list: [{ book_ref: pir, rationale: `{${pir}} came back for {${f}} readers.` }],
-    programmes: [{ kind: "book_club", title: "Read together", description: `A club for fans of {${f}} reading {${pir}}.`, book_refs: [pir], signal_refs: [f] }],
+    programmes: [{ kind: "book_club", title: "Read together", description: `A club for fans of {${f}} reading {${pir}}.`, book_refs: [pir], signal_refs: [f] }, ...morePrograms(f)],
   };
 }
 
@@ -420,7 +434,7 @@ describe("agent loop: needs_input pause and resume", () => {
           toolCall("submit_report", {
             bridge_shelf: [{ loved_refs: [ref(req, "Ambiguo")], book_ref: ref(req, "Station Eleven"), why: `{${ref(req, "Station Eleven")}} came back for fans of {${ref(req, "Ambiguo")}}.` }],
             buy_list: [{ book_ref: ref(req, "Station Eleven"), rationale: `{${ref(req, "Station Eleven")}} came back for {${ref(req, "Ambiguo")}} readers.` }],
-            programmes: [{ kind: "themed_display", title: "If you liked it", description: `Display {${ref(req, "Station Eleven")}} for fans of {${ref(req, "Ambiguo")}}.`, book_refs: [ref(req, "Station Eleven")], signal_refs: [ref(req, "Ambiguo")] }],
+            programmes: [{ kind: "themed_display", title: "If you liked it", description: `Display {${ref(req, "Station Eleven")}} for fans of {${ref(req, "Ambiguo")}}.`, book_refs: [ref(req, "Station Eleven")], signal_refs: [ref(req, "Ambiguo")] }, ...morePrograms(ref(req, "Ambiguo"))],
           }),
         ),
     ]);
@@ -572,7 +586,7 @@ describe("no-invention guard", () => {
         { book_ref: hm, rationale: `{${hm}} is loved by 87 patrons in this area.` }, // invented number
         { book_ref: "e98", rationale: "No such ref." },
       ],
-      programmes: [{ kind: "film_night", title: "Watch and borrow", description: `Show {${sev}}, offer {${pir}}.`, book_refs: [pir], signal_refs: [sev] }],
+      programmes: [{ kind: "film_night", title: "Watch and borrow", description: `Show {${sev}}, offer {${pir}}.`, book_refs: [pir], signal_refs: [sev] }, ...morePrograms(sev)],
     };
   };
 
@@ -607,7 +621,7 @@ describe("no-invention guard", () => {
     const everything = allStrings(report).join("\n");
     assert.ok(!everything.includes("Invented Novel"));
     assert.ok(!everything.includes("87"));
-    assert.equal(report.bridgeShelf.length, 2);
+    assert.equal(report.bridgeShelf.length, 3);
   });
 
   it("on the last repair attempt publishes only the items that trace to Qloo and says what was withheld", async (t) => {
@@ -651,7 +665,7 @@ describe("no-invention guard", () => {
     assert.equal(await r.run(llm), "completed");
     const report = lastReport(r);
     assert.ok(!allStrings(report).join("\n").includes("Invented Novel"));
-    assert.equal(report.bridgeShelf.length, 2);
+    assert.equal(report.bridgeShelf.length, 3);
   });
 
   it("a model that only chats after getting results is nudged once, then the run fails honestly (no made-up report)", async (t) => {
@@ -676,15 +690,48 @@ describe("no-invention guard", () => {
           toolCall("submit_report", {
             bridge_shelf: [{ loved_refs: [bear], book_ref: klara, why: `{${klara}} came back for fans of {${bear}}.` }],
             buy_list: [{ book_ref: pir, rationale: `{${pir}} came back for readers of {${sev}}.` }],
-            programmes: [{ kind: "other", title: "Table", description: `For fans of {${sev}}.`, signal_refs: [sev] }],
+            programmes: [{ kind: "other", title: "Table", description: `For fans of {${sev}}.`, signal_refs: [sev] }, ...morePrograms(sev)],
           }),
         );
       },
     ]);
     await r.run(llm);
     const report = lastReport(r);
-    assert.equal(report.bridgeShelf.length, 0, "the unsupported pairing is withheld");
+    assert.ok(!report.bridgeShelf.some((c) => c.book.name === "Klara and the Sun"), "the unsupported pairing is withheld");
+    // The buy-list book still gets its shelf-talker, paired with the signals whose calls actually returned it.
+    assert.deepEqual(report.bridgeShelf.map((c) => [c.loved.map((l) => l.name), c.book.name]), [[["Severance", "The Bear"], "Piranesi"]]);
     assert.equal(report.buyList.length, 1);
+  });
+
+  it("shows a title once when the model types it beside its placeholder", async (t) => {
+    const r = rig(t);
+    const llm = new ScriptLlm([
+      ...prime,
+      (req) => {
+        const sub = goodSubmission(req) as { bridge_shelf: { why: string }[] };
+        sub.bridge_shelf[0]!.why = `{${ref(req, "Piranesi")}} (Piranesi) came back for fans of Severance ({${ref(req, "Severance")}}).`;
+        return calls(toolCall("submit_report", sub));
+      },
+    ]);
+    assert.equal(await r.run(llm), "completed");
+    assert.equal(lastReport(r).bridgeShelf[0]!.why, "Piranesi came back for fans of Severance.");
+  });
+
+  it("asks for three programme ideas when a report brings fewer, then publishes the repaired one", async (t) => {
+    const r = rig(t);
+    const llm = new ScriptLlm([
+      ...prime,
+      (req) => {
+        const sub = goodSubmission(req) as { programmes: unknown[] };
+        sub.programmes = sub.programmes.slice(0, 1);
+        return calls(toolCall("submit_report", sub));
+      },
+      (req) => calls(toolCall("submit_report", goodSubmission(req))),
+    ]);
+    assert.equal(await r.run(llm), "completed");
+    assert.equal(r.ev.of("report").length, 1, "the short report is not published");
+    assert.ok(llm.requests[2]!.messages.some((m) => m.role === "tool" && /give 3 ideas/.test(String(m.content))));
+    assert.equal(lastReport(r).programmes.length, 3);
   });
 });
 

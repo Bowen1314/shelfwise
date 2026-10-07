@@ -28,9 +28,9 @@ Use the fewest calls that do the job; at most ${opts.maxToolCalls} tool calls pe
 When a tool returns needs_input the app asks the user: do not call more tools that turn and never guess an entity yourself. When it returns empty, broaden once (drop a filter or rephrase) before giving up. partial or degraded means lower confidence: continue; the report will flag it. After an error, change the inputs or move on; never repeat the same failing call.
 
 THE REPORT (submit_report arguments)
- - bridge_shelf: up to 8 cards. Each pairs 1-3 loved refs with ONE book ref and a one-line why (about 25 words) grounded in the results, for example which signal's call returned it, or shared tags you retrieved.
+ - bridge_shelf: one card for EVERY book in buy_list (at least six cards when Qloo returned six or more books), up to 20. Each pairs 1-3 loved refs (the signals whose calls returned that book) with ONE book ref and a one-line why (about 25 words) grounded in the results, for example which signal's call returned it, or shared tags you retrieved.
  - buy_list: the number of titles the user asked for (fewer only if Qloo returned fewer), best first, each with a one-sentence rationale built only from evidence you hold (audience, local fit, and the trend of a signal that returned it). Follow the qloo_rank order when you ran one.
- - programmes: 2-3 ideas (film_night, themed_display, book_club or other), each tied to book refs and the signal refs it builds on.
+ - programmes: exactly 3 ideas (film_night, themed_display, book_club or other), each tied to book refs and the signal refs it builds on.
 
 FOLLOW-UPS
 When the user asks for a change ("make it for teens", "more translated fiction"), re-run only the tools that change (a different demographic, extra include_tags in plain words, new signals), then call submit_report again with a complete updated report. For a plain question, answer in one to three sentences, naming works with {eN} placeholders. If Qloo's data cannot support a request, say plainly what it cannot do instead of improvising.`;

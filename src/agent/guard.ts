@@ -26,7 +26,7 @@ import { type CallRecord, type EntityRecord, EvidenceStore, normName, toRef } fr
  * Anything that fails is withheld and reported back to the model for one bounded repair.
  */
 
-export const LIMITS = { why: 240, rationale: 340, title: 90, description: 440, maxCards: 12, maxProgrammes: 3 };
+export const LIMITS = { why: 240, rationale: 340, title: 90, description: 440, maxCards: 20, maxProgrammes: 3, minCards: 6, minProgrammes: 3 };
 
 export interface GuardContext {
   store: EvidenceStore;
@@ -103,11 +103,16 @@ export function checkText(
   }
   if (problems.length) return { ok: false, problems };
 
-  const expanded = raw
+  let expanded = raw
     .replace(PLACEHOLDER, (_, h: string) => ctx.store.entity(h)?.name ?? "")
     .replace(/\*/g, "")
     .replace(/\s+/g, " ")
     .trim();
+  // Models often write the title beside its placeholder ("{e3} (Severance)" or "Severance ({e3})"); show it once.
+  for (const name of new Set(used.map((h) => ctx.store.entity(h)?.name ?? "").filter(Boolean))) {
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    expanded = expanded.replace(new RegExp(`${esc}\\s*\\(\\s*${esc}\\s*\\)`, "gi"), () => name);
+  }
   return { ok: true, text: expanded };
 }
 
@@ -298,6 +303,7 @@ export function checkSubmission(raw: unknown, ctx: GuardContext): GuardResult {
 
   // ---- buy list
   const buy: BuyItem[] = [];
+  const buyBooks: EntityRecord[] = [];
   const seenBooks = new Set<string>();
   const buyRaw = Array.isArray(sub["buy_list"]) ? (sub["buy_list"] as unknown[]) : [];
   if (!Array.isArray(sub["buy_list"])) problems.push("buy_list: must be an array");
@@ -317,6 +323,7 @@ export function checkSubmission(raw: unknown, ctx: GuardContext): GuardResult {
     if (!itemProblems.length && book && rationale.ok) {
       if (seenBooks.has(book.handle) || buy.length >= wanted) return;
       seenBooks.add(book.handle);
+      buyBooks.push(book);
       const { evidence, cites } = buyEvidence(ctx.store, book);
       buy.push({ rank: buy.length + 1, book: toRef(book), rationale: rationale.text, evidence, cites });
     } else {
@@ -324,6 +331,40 @@ export function checkSubmission(raw: unknown, ctx: GuardContext): GuardResult {
       withheld += 1;
     }
   });
+
+  // ---- a shelf-talker for every book on the buy list
+  // A buy-list book the model left off the shelf gets a card joined from the evidence: the signals whose calls
+  // returned it, in a fixed sentence. A book no queried signal returned gets no card rather than an invented pairing.
+  const carded = new Set(cards.map((c) => c.book.handle));
+  const signals = ctx.store.allEntities().filter((e) => ctx.store.isInput(e));
+  for (const book of buyBooks) {
+    if (carded.has(book.handle) || cards.length >= LIMITS.maxCards) continue;
+    const backed = signals.map((l) => ({ l, support: ctx.store.supportingCalls(l, book) })).filter((x) => x.support.length > 0).slice(0, 2);
+    if (!backed.length) continue;
+    const [first, second] = backed;
+    const why = checkText(
+      "auto",
+      `{${book.handle}} came back for fans of {${first!.l.handle}}${second ? `, and also for fans of {${second.l.handle}}` : ""}.`,
+      LIMITS.why,
+      ctx,
+    );
+    if (!why.ok) continue;
+    const cites: Cite[] = [];
+    for (const s of backed.flatMap((x) => x.support.slice(0, 2))) if (!cites.some((c) => c.callId === s.call.callId)) cites.push(citeFor(s.call, book));
+    carded.add(book.handle);
+    cards.push({
+      id: `b${cards.length + 1}`,
+      loved: backed.map((x) => toRef(x.l)),
+      book: toRef(book),
+      why: why.text,
+      cites,
+      reduced: backed.some((x) => x.support.some((s) => isReduced(s.call))),
+    });
+  }
+  const minCards = Math.min(LIMITS.minCards, buy.length);
+  if (cards.length > 0 && cards.length < minCards) {
+    problems.push(`bridge_shelf: only ${cards.length} usable cards; add cards for other books your signals returned so the shelf has at least ${minCards}`);
+  }
 
   // ---- programmes
   const programmes: ProgrammeIdea[] = [];
@@ -392,6 +433,9 @@ export function checkSubmission(raw: unknown, ctx: GuardContext): GuardResult {
   if (cards.length === 0) problems.push("bridge_shelf: no valid cards; submit at least one supported pairing");
   if (buy.length === 0) problems.push("buy_list: no valid items; submit at least one book returned by Qloo");
   if (programmes.length === 0) problems.push("programmes: no valid ideas; submit at least one");
+  else if (programmes.length < LIMITS.minProgrammes) {
+    problems.push(`programmes: give ${LIMITS.minProgrammes} ideas (film_night, themed_display, book_club or other); only ${programmes.length} usable`);
+  }
 
   const bn = budgetNote(ctx.form);
   const report: Report = {
