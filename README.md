@@ -34,7 +34,7 @@ back three things you can use the same day:
 1. **A bridge shelf**: printable "Loved *X*? Try *Y*" shelf-talker cards, several per page.
 2. **A buy / feature list**: titles in rank order, each with its evidence (which signals it matched, where it
    ranked, local fit, and whether interest in the show or artist behind it is rising).
-3. **Programme ideas**: two or three event or display ideas tied to the same evidence.
+3. **Programme ideas**: three event or display ideas tied to the same evidence.
 
 A follow-up chat re-runs the relevant Qloo calls ("make it for teens", "more translated fiction").
 An **evidence trail** panel lists every tool call with its inputs, status and a summary of what came back.
