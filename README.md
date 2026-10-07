@@ -6,9 +6,11 @@ grounded in [Qloo](https://qloo.com)'s cross-domain taste graph.
 > **Built with AI coding assistance.** This project was written with Claude Code (Anthropic's AI coding
 > assistant), directed and reviewed by a human. The code, tests and docs are open source under the MIT license.
 
-> **Status: phase 1 (offline build).** Everything below was built and tested without a Qloo or Nebius key.
-> It runs end to end on clearly-labelled **sample data**. Live Qloo and live model calls are wired up but have
-> not been exercised yet; see [What is verified, and what is not](#what-is-verified-and-what-is-not).
+**Demo video:** [youtu.be/oUe4gt1D8rk](https://youtu.be/oUe4gt1D8rk) · **Try it:** [shelfwise.gotclass.xyz](https://shelfwise.gotclass.xyz)
+
+> **Status: live.** The public deployment runs on real Qloo data, with NVIDIA Nemotron 3 Super on Nebius Token
+> Factory as the planner. Without keys it still runs end to end on clearly-labelled **sample data**; see
+> [What is verified, and what is not](#what-is-verified-and-what-is-not).
 
 ## The problem
 
@@ -251,18 +253,21 @@ app was driven in a real browser in sample-data mode: the ambiguity prompt and r
 evidence trail, a follow-up that re-ran the tools, desktop and phone widths, and the print layout of the
 shelf-talkers exported to PDF.
 
+Verified live (phase 2): the Docker image runs on a Linux server behind a Cloudflare tunnel, with the hackathon
+Qloo key and Nemotron 3 Super on Nebius Token Factory driving the loop. Live runs complete end to end: a plan, Qloo
+calls streamed into the evidence trail as they happen, and a report with a shelf-talker for every buy-list book
+and three programme ideas.
+
 Not verified yet:
 
 - Accessibility beyond automated checks: no screen-reader pass, and the shelf-talkers were exported to PDF but not
   sent to a physical printer.
-- Real Qloo results. The sample fixtures are **placeholders** with invented affinities and trends; only the real
-  tool *schemas* are real. The payload shapes of `where_popular` heatmaps, `trends` series, `compare_audiences`
-  and explainability are read defensively and have not been checked against live responses.
-- A live Nemotron model driving the loop. Tool-calling support per model is unconfirmed until `npm run check:llm`
-  is run with a key. The sample-data planner is rule-based, not a language model.
-- The Docker image has not been built on the machine this was developed on (the Docker daemon was not running).
-  The Dockerfile's stages were reproduced by hand instead: a production-only install, the built `dist/`, started
-  in sample and live-without-keys modes.
+- Uneven live coverage of the Qloo tools. `recommend`, `rank` and `where_popular` run on nearly every live
+  request; `trends`, `compare_audiences` and entity tags are optional steps the model often skips, so their live
+  payload handling has seen far fewer runs. The sample fixtures remain **placeholders** with invented affinities
+  and trends.
+- Only Nemotron 3 Super has driven the loop live. Other models need `npm run check:llm` first. The sample-data
+  planner is rule-based, not a language model.
 - Known advisories: `npm audit` reports 4 findings (2 moderate, 2 high) in `undici` and `brace-expansion` inside
   the dependency tree of `@qloo/qloo-harness` (via `@earendil-works/pi-coding-agent`). They are not in code
   Shelfwise imports itself. npm reports no fix for the `undici` ones; the `brace-expansion` one would need an
