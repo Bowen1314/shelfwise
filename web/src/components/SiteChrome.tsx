@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type HealthResponse, LIMITS_LINE, SAMPLE_DATA_LABEL } from "@shared/types";
+import { type HealthResponse, SAMPLE_DATA_LABEL } from "@shared/types";
 import { sampleBannerDetail, sampleBannerPlanner } from "../lib/banner";
 import { startThemeFade } from "../lib/themeFade";
 import { Icon, LogoMark, type IconName } from "./Icon";
@@ -109,14 +109,9 @@ export function Header({ narrow, view, onNavigate, crumb }: HeaderProps) {
         <div className="content-topbar">
           <div className="content-topbar__crumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>{crumb}</strong></div>
           <div className="content-topbar__actions">
-            <div className="content-topbar__meta">Qloo taste graph <span aria-hidden="true">·</span> grounded recommendations</div>
             <ThemeToggle />
           </div>
         </div>
-        <p className="limits-strip">
-          <Icon name="info" />
-          <span>{LIMITS_LINE}</span>
-        </p>
       </header>
     </>
   );
@@ -170,15 +165,5 @@ export function ThemeToggle() {
       <Icon name={dark ? "sun" : "moon"} />
       <span className="theme-toggle__label">{dark ? "Light" : "Dark"}</span>
     </button>
-  );
-}
-
-export function Footer({ narrow }: { narrow: boolean }) {
-  return (
-    <footer className={`site-footer${narrow ? " site-footer--narrow" : ""}`}>
-      <p><span className="footer__code">SW/01</span> {LIMITS_LINE}</p>
-      <p>Built with Qloo’s taste graph and an NVIDIA Nemotron model on Nebius Token Factory.</p>
-      <p>Aggregate affinities, not claims about individuals.</p>
-    </footer>
   );
 }

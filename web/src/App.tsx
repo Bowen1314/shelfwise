@@ -9,7 +9,7 @@ import { RecentRuns } from "./components/RecentRuns";
 import { Results, ResultsSkeleton } from "./components/Results";
 import { RunPanel } from "./components/RunPanel";
 import { RequestSummary, RunError } from "./components/RunNotices";
-import { Footer, Header, SampleBanner, type View } from "./components/SiteChrome";
+import { Header, SampleBanner, type View } from "./components/SiteChrome";
 import { HowItWorks, LoadingPanel, NotConfigured, ServerUnreachable } from "./components/StatePanels";
 import { TrailContext } from "./components/TrailContext";
 import { useHealth } from "./hooks/useHealth";
@@ -18,6 +18,7 @@ import { usePersistedTab } from "./hooks/usePersistedTab";
 import { useRecentRuns } from "./hooks/useRecentRuns";
 import { useRun } from "./hooks/useRun";
 import { useTrailController } from "./hooks/useTrailController";
+import { LIVE_EXAMPLES } from "./lib/examples";
 import { recentRunFrom } from "./lib/recentRuns";
 import { EMPTY_FORM, type FormValues } from "./lib/validate";
 
@@ -141,7 +142,7 @@ export function App() {
           values={form}
           onChange={patchForm}
           onSubmit={startSearch}
-          samples={healthState.health.mode === "fixtures" ? healthState.health.sampleInputs : []}
+          samples={healthState.health.mode === "fixtures" ? healthState.health.sampleInputs : LIVE_EXAMPLES}
           disabled={!healthState.health.ready}
           failure={state.error}
           onRetry={run.retry}
@@ -246,8 +247,6 @@ export function App() {
                 </aside>
               </main>
             )}
-
-            <Footer narrow={narrow} />
           </div>
         </div>
       </div>

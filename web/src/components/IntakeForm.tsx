@@ -17,7 +17,7 @@ interface IntakeFormProps {
   values: FormValues;
   onChange: (patch: Partial<FormValues>) => void;
   onSubmit: (input: FormInput) => void;
-  /** Sample inputs offered by the server in fixtures mode. */
+  /** One-click example briefs: the server's sample inputs in fixtures mode, LIVE_EXAMPLES in live mode. */
   samples: FormInput[];
   /** True when the server is not configured: the form stays visible but cannot be used. */
   disabled: boolean;
@@ -100,7 +100,7 @@ export function IntakeForm({ values, onChange, onSubmit, samples, disabled, fail
       {samples.length > 0 && (
         <div className="samples">
           <p className="samples__label" id={`${id}-samples`}>
-            Try a sample
+            Try an example
           </p>
           <ul className="samples__list" aria-labelledby={`${id}-samples`}>
             {samples.map((sample) => (

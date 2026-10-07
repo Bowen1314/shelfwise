@@ -123,7 +123,8 @@ html[data-theme="dark"] {
   --code-ink: #edf2ff;
 }
 
-html { scroll-padding-top: 76px; }
+html { scroll-padding-top: 76px; scrollbar-width: none; overscroll-behavior-y: none; } /* page still scrolls; no classic page scrollbar, no rubber-band past the ends */
+html::-webkit-scrollbar { display: none; }
 body { background: var(--paper); color: var(--ink); font-family: var(--font-sans); }
 .app { min-height: 100vh; background: var(--paper); }
 /* The theme switch cross-fades colours. ThemeToggle sets html.theme-fading for the length of one fade
@@ -191,7 +192,7 @@ html.theme-fading :is(.app, .sample-banner, .workspace-sidebar, .site-header, .c
 .limits-strip__tag { margin-left: auto; color: var(--ink-2); font: 0.62rem var(--font-mono); }
 
 /* Workspace layout */
-.shell { width: 100%; max-width: 1280px; margin: 0 auto; padding: 42px clamp(22px, 4vw, 48px) 70px; box-sizing: border-box; }
+.shell { width: 100%; max-width: 1280px; margin: 0 auto; padding: 42px clamp(22px, 4vw, 48px) 32px; box-sizing: border-box; }
 .shell--narrow { width: 100%; display: block; }
 .work-stage--landing { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, .65fr); gap: 24px; align-items: start; }
 .landing-main { min-width: 0; display: grid; gap: 24px; }
@@ -199,7 +200,7 @@ html.theme-fading :is(.app, .sample-banner, .workspace-sidebar, .site-header, .c
 .landing-heading__eyebrow { color: var(--accent); font: 700 .66rem var(--font-mono); letter-spacing: .09em; text-transform: uppercase; }
 .landing-heading h2 { color: var(--ink); font: 740 clamp(2.35rem, 4vw, 3.55rem)/1.06 var(--font-sans); letter-spacing: -.065em; }
 .landing-heading > p:last-child { max-width: 59ch; color: var(--ink-2); font-size: .92rem; line-height: 1.55; }
-.preview-panel { position: sticky; top: 24px; min-width: 0; padding: 23px; border: 1px solid var(--rule); border-radius: var(--r-l); background: var(--surface); box-shadow: var(--shadow); }
+.preview-panel { position: sticky; min-width: 0; padding: 23px; border: 1px solid var(--rule); border-radius: var(--r-l); background: var(--surface); box-shadow: var(--shadow); }
 .preview-panel__topline { display: flex; align-items: center; justify-content: space-between; color: var(--ink-2); font: 700 .64rem var(--font-mono); letter-spacing: .09em; text-transform: uppercase; }
 .preview-panel__status { padding: 4px 8px; border-radius: 999px; background: var(--teal-soft); color: var(--teal-ink); font-size: .6rem; letter-spacing: .02em; }
 .preview-panel h2 { margin-top: 22px; color: var(--ink); font: 700 1.2rem var(--font-sans); letter-spacing: -.025em; }
@@ -453,6 +454,23 @@ html.theme-fading :is(.app, .sample-banner, .workspace-sidebar, .site-header, .c
   .tagline { font-size: .68rem; }
   .talker { min-height: 0; }
   .tab { padding-inline: 8px; font-size: .63rem; }
+}
+
+/* Sticky top bar: breadcrumb and theme toggle stay put while the page scrolls (below the sample banner when it
+   shows). Other sticky parts and scroll targets clear it via --topbar-h (68px bar + 1px border). */
+:root { --topbar-h: 69px; }
+.site-header { position: sticky; top: 0; z-index: 30; }
+.app--sample .site-header { top: var(--banner-h, 34px); }
+/* The landing preview card pins exactly where it rests (top bar + the .shell top padding), so it never shifts. */
+.preview-panel { top: calc(var(--topbar-h) + 42px); }
+.app--sample .preview-panel { top: calc(var(--banner-h, 34px) + var(--topbar-h) + 42px); }
+html { scroll-padding-top: calc(var(--banner-h, 0px) + var(--topbar-h) + 12px); }
+.run-anchor { scroll-margin-top: calc(var(--banner-h, 0px) + var(--topbar-h) + 12px); }
+.trail { top: calc(var(--topbar-h) + 18px); max-height: calc(100vh - var(--topbar-h) - 36px); max-height: calc(100svh - var(--topbar-h) - 36px); }
+.app--sample .trail { top: calc(var(--banner-h, 34px) + var(--topbar-h) + 18px); max-height: calc(100svh - var(--banner-h, 34px) - var(--topbar-h) - 36px); }
+.trail--sheet, .app--sample .trail--sheet { top: auto; max-height: 82vh; max-height: 82svh; }
+@media (max-width: 720px) {
+  :root { --topbar-h: 57px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

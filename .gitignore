@@ -9,3 +9,5 @@ coverage/
 .vite/
 # local tool configuration (machine-specific paths)
 .claude/
+# demo video output (recorded by scripts/record_demo.mjs; not committed)
+docs/demo/
