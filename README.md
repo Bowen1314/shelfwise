@@ -61,16 +61,26 @@ The exact input schemas, verified behaviours and the gaps against this product d
 be traced to a Qloo result, and live mode never falls back to sample data or to the model's memory. If the keys
 are missing the server answers "not configured".
 
-### The language model
+### The language model: NVIDIA Nemotron 3 Super on Nebius Token Factory
 
-A Nemotron model on Nebius Token Factory plans the workflow, chooses tools, and writes short copy (the "why"
-lines and programme text). It **never supplies titles or scores**:
+`nvidia/nemotron-3-super-120b-a12b`, served by Nebius Token Factory through its OpenAI-compatible endpoint, is the
+agent's planner. Every run is a loop of Nemotron turns: it writes the visible plan, decides which Qloo tools to call
+and with what arguments (often several in parallel), reads the results, recovers from `needs_input`, empty and
+error results, and finally calls `submit_report`. Super suits this job: it handles tool calling reliably, its
+256K context holds a whole run's tool results, and live runs usually finish in under half a minute. Token Factory
+meant no GPU to manage; switching models is one environment variable (`SHELFWISE_LLM_MODEL`). No other Nebius
+services are used; the app itself runs in Docker on a small Linux server.
+
+Nemotron plans the workflow, chooses tools, and writes short copy (the "why" lines and programme text). It
+**never supplies titles or scores**:
 
 - It selects books and signals by *reference* (`e12`) to entities that appeared in tool results.
 - Titles, affinities, ranks, local fit and trend directions are joined in by the server from those same results.
 - Its prose may name works only through `{e12}` placeholders. Quoted or emphasised names must match a returned
   name or the user's own words, and every number must appear in a Qloo result or in the user's input.
 - A "Loved *X*? Try *Y*" pairing is accepted only if a Qloo call that used *X* as its signal returned *Y*.
+- Every book on the buy list gets a shelf-talker. If the model leaves one out, the server joins a card from the Qloo
+  calls that returned that book, in a fixed sentence with citations; a book no signal returned gets none.
 - Anything that fails is withheld, the model gets one or two bounded chances to repair it, and the report says
   what was withheld.
 
